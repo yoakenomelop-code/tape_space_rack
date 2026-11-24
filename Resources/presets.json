@@ -134,7 +134,7 @@
     "name": "HQ Quarter (Sync)",
     "p": {
      "variant": 0,
-     "sync": 9,
+     "sync": 14,
      "feedback": 30
     }
    },
@@ -142,7 +142,7 @@
     "name": "HQ Dotted Eighth",
     "p": {
      "variant": 0,
-     "sync": 7,
+     "sync": 12,
      "feedback": 40,
      "mix": 25
     }
@@ -162,7 +162,7 @@
     "p": {
      "variant": 0,
      "stereo": 3,
-     "sync": 9,
+     "sync": 14,
      "ratioLR": 75,
      "feedback": 35
     }
@@ -172,7 +172,7 @@
     "p": {
      "variant": 0,
      "stereo": 2,
-     "sync": 6,
+     "sync": 11,
      "feedback": 45
     }
    },
@@ -181,7 +181,7 @@
     "p": {
      "variant": 0,
      "stereo": 2,
-     "sync": 5,
+     "sync": 10,
      "feedback": 40,
      "highcut": 8000
     }
@@ -202,7 +202,7 @@
      "variant": 0,
      "reverse": 1,
      "stereo": 2,
-     "sync": 9,
+     "sync": 14,
      "feedback": 40,
      "mix": 35
     }
@@ -225,7 +225,7 @@
     "name": "Dark Ambient Wash",
     "p": {
      "variant": 0,
-     "sync": 10,
+     "sync": 15,
      "feedback": 75,
      "highcut": 3000,
      "modDepth": 20,
@@ -319,7 +319,7 @@
     "name": "Vintage Digital Dub",
     "p": {
      "variant": 3,
-     "sync": 10,
+     "sync": 15,
      "feedback": 70,
      "lowcut": 200,
      "highcut": 4000,
@@ -329,10 +329,42 @@
     }
    },
    {
+    "name": "Fine 5/16 Polyrhythm",
+    "p": {
+     "variant": 0,
+     "sync": 38,
+     "feedback": 45,
+     "stereo": 2,
+     "mix": 25
+    }
+   },
+   {
+    "name": "Fine 7/32 Push",
+    "p": {
+     "variant": 0,
+     "sync": 33,
+     "feedback": 35,
+     "highcut": 9000,
+     "mix": 25
+    }
+   },
+   {
+    "name": "Bar-long Swell (1 bar)",
+    "p": {
+     "variant": 0,
+     "sync": 20,
+     "feedback": 40,
+     "reverse": 0,
+     "highcut": 6000,
+     "modDepth": 15,
+     "mix": 30
+    }
+   },
+   {
     "name": "Ducked Vocal Echo",
     "p": {
      "variant": 0,
-     "sync": 9,
+     "sync": 14,
      "feedback": 35,
      "duck": 70,
      "mix": 35,
@@ -488,7 +520,28 @@
      "variant": 0,
      "decay": 3,
      "revLen": 1500,
+     "revSync": 17,
      "mix": 35
+    }
+   },
+   {
+    "name": "Tempo Plate (decay 1 bar)",
+    "p": {
+     "variant": 2,
+     "decaySync": 20,
+     "preSync": 2,
+     "er": 0,
+     "lowcut": 200,
+     "mix": 25
+    }
+   },
+   {
+    "name": "Tempo Hall (pre 1/32, decay 2 bars)",
+    "p": {
+     "variant": 0,
+     "decaySync": 22,
+     "preSync": 5,
+     "mix": 25
     }
    },
    {
@@ -510,6 +563,7 @@
      "irIndex": 5,
      "reverse": 1,
      "revLen": 2500,
+     "revSync": 20,
      "mix": 35
     }
    }

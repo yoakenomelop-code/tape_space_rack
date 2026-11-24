@@ -45,10 +45,44 @@ public:
     void resized() override;
     void mouseEnter (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
+    void mouseDown (const juce::MouseEvent&) override;
     juce::Slider slider;
     int slot, band;
+    // clicking the value text: open a picker, or type an exact number (plain units)
+    std::function<void()> onValueClick;
+    std::function<double()> plainGet; std::function<void (double)> plainSet;
+    double plainLo = 0, plainHi = 1; bool msUnit = false;
 private:
     juce::String caption; HoverSink& sink; bool syncing = false;
+    std::unique_ptr<juce::TextEditor> entry;
+    void finishEntry (bool apply);
+};
+
+// grid of the 79 tempo-sync note values (same layout as the web version)
+class SyncPicker : public juce::Component
+{
+public:
+    SyncPicker();
+    void open (const juce::String& title, std::function<int()> get, std::function<void (int)> set, std::function<double()> bpm);
+    void close();
+    void paint (juce::Graphics&) override;
+    void resized() override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    bool keyPressed (const juce::KeyPress&) override;
+private:
+    static constexpr int kRows = 20;
+    juce::Rectangle<int> box, head, grid, foot;
+    juce::Rectangle<int> cell (int i) const;
+    int hit (juce::Point<int>) const;
+    void mark (int i);
+    void pick (int i);
+    void filter();
+    juce::String title; std::function<int()> getter; std::function<void (int)> setter; std::function<double()> bpmFn;
+    int cur = 0; std::vector<bool> match;
+    juce::TextEditor search;
+    juce::OwnedArray<juce::TextButton> jumps;
+    juce::TextButton closeBtn { juce::CharPointer_UTF8 ("\xc3\x97") };
 };
 
 class Seg : public juce::Component
@@ -145,6 +179,7 @@ private:
     VKnob* lin (const char* key, const juce::String& label, double lo, double hi, double step, std::function<juce::String (double)> fmt, int hl, std::function<juce::String()> desc);
     VKnob* logKnob (const char* key, const juce::String& label, double lo, double hi, std::function<juce::String (double)> fmt, int hl, std::function<juce::String()> desc);
     VKnob* listKnob (const juce::String& label, int hl, const juce::StringArray& names, std::function<int()> getI, std::function<void (int)> setI, int def, std::function<juce::String()> desc);
+    VKnob* syncKnob (const char* key, const juce::String& label, int hl, const juce::String& title, const juce::String& what);
     Seg* seg (const juce::String& caption, const juce::StringArray& names, int hl, std::function<int()> g, std::function<void (int)> s, std::function<juce::String (int)> desc);
     juce::TextButton* tog (const juce::String& label, int hl, std::function<bool()> g, std::function<void (bool)> s, std::function<juce::String()> desc = {});
     void mixOut (const juce::String& what);
@@ -211,6 +246,8 @@ public:
     void dragPanel (ts::ui::ModulePanel&, int yInRack, bool finished);
     int highlightSlot() const { return hlSlot; }
     int highlightBand() const { return hlBand; }
+    void openPicker (const juce::String& title, std::function<int()> get, std::function<void (int)> set)
+    { picker.open (title, std::move (get), std::move (set), [this] { return proc.hostBpm.load(); }); }
     bool isMachineOpen (int slot) const { return juce::isPositiveAndBelow (slot, (int) machineOpen.size()) && machineOpen[(size_t) slot]; }
     void setMachineOpen (int slot, bool open) { if (juce::isPositiveAndBelow (slot, (int) machineOpen.size())) { machineOpen[(size_t) slot] = open; layoutRack(); } }
     void layoutRack();
@@ -235,5 +272,6 @@ private:
     float inLvl = 0, outLvl = 0;
     int dropY = -1;
     juce::Rectangle<int> hintArea, meterArea, toolbarArea, bpmArea;
+    ts::ui::SyncPicker picker;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TapeSpaceRackEditor)
 };

@@ -76,8 +76,9 @@ void TapeSpaceRackProcessor::emptyTrash()
 }
 
 // ----------------------------------------------------------------------------- impulse responses
-std::string TapeSpaceRackProcessor::irKeyOf (int s, const Params& p) const
+std::string TapeSpaceRackProcessor::irKeyOf (int s, const Params& p0) const
 {
+    const Params p = resolveTimes (p0, hostBpm.load());
     if (! (ival (p.source) > 0 || p.reverse != 0)) return {};
     const int src = ival (p.source);
     juce::String k;
@@ -115,8 +116,8 @@ void TapeSpaceRackProcessor::buildSlot (int s, bool publish)
     auto makeIR = [&] (int gen) -> ConvPair*
     {
         IR ir;
-        if (ival (p.source) == 2) { IR user = resampledUserIR (s, fs); ir = buildIR (p, fs, user[0].empty() ? nullptr : &user); }
-        else ir = buildIR (p, fs, nullptr);
+        if (ival (p.source) == 2) { IR user = resampledUserIR (s, fs); ir = buildIR (p, fs, user[0].empty() ? nullptr : &user, hostBpm.load()); }
+        else ir = buildIR (p, fs, nullptr, hostBpm.load());
         { const juce::ScopedLock sl (irLock); builtIR[si] = ir; }
         ++irSerials[si];
         if (ir[0].empty()) return nullptr;

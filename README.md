@@ -11,20 +11,26 @@ Web 版と同じ DSP（音のアルゴリズム）を C++ に移植していま�
 | モジュール | モデル | 主なつまみ |
 |---|---|---|
 | **Tape Machine** | Studio 2-Track ／ Multitrack ／ Cassette | INPUT、FORMULA（MODERN / CLASSIC / VINTAGE）、BIAS、SPEED 3.75 / 7.5 / 15 / 30 ips、EQ NAB / CCIR、WOW、FLUTTER、HISS、MIX、OUTPUT。マシン画面で電子回路（真空管 / ソリッドステート / トランスレス）、ヘッド（新品 / 摩耗 / 研磨）、録音レベル（標準 / +3 / +6 dB）、HEADROOM、AGE |
-| **Echo / Delay** | Digital HQ ／ Tape Echo ／ Analog BBD ／ Vintage Digital | TIME（〜4 s）、SYNC（1/32〜1/1、3 連符・付点）、FEEDBACK（〜110 %）、LOW / HIGH CUT（ループ内）、DRIVE、MONO / STEREO / **PING-PONG** / DUAL、WIDTH、**REVERSE**、MOD RATE / DEPTH、DUCK、**WET EQ**（LOW / MID・周波数 / HIGH）、Tape Echo は再生ヘッド 1〜3 の組み合わせ |
-| **Space Reverb** | ALGO（Hall / Room / Plate / Chamber / Cathedral）／ **IR**（内蔵 7 種）／ **USER IR**（ファイル読み込み） | PRE-DELAY、SIZE、DECAY、LOW ×・HIGH ×（帯域ごとの残響時間）、DIFFUSION、ER、MOD、**REVERSE**（長さ 0.1〜6 s）、IR LENGTH、LOW / HIGH CUT、WET EQ、WIDTH、MIX、OUTPUT |
+| **Echo / Delay** | Digital HQ ／ Tape Echo ／ Analog BBD ／ Vintage Digital | TIME（Digital HQ は〜8 s）、SYNC（79 種、下記）、FEEDBACK（〜110 %）、LOW / HIGH CUT（ループ内）、DRIVE、MONO / STEREO / **PING-PONG** / DUAL、WIDTH、**REVERSE**、MOD RATE / DEPTH、DUCK、**WET EQ**（LOW / MID・周波数 / HIGH）、Tape Echo は再生ヘッド 1〜3 の組み合わせ |
+| **Space Reverb** | ALGO（Hall / Room / Plate / Chamber / Cathedral）／ **IR**（内蔵 7 種）／ **USER IR**（ファイル読み込み） | PRE-DELAY（〜1 s・SYNC）、SIZE、DECAY（SYNC）、LOW ×・HIGH ×（帯域ごとの残響時間）、DIFFUSION、ER、MOD、**REVERSE**（長さ 0.1〜6 s・SYNC）、IR LENGTH、LOW / HIGH CUT、WET EQ、WIDTH、MIX、OUTPUT |
 
 プラグインは 1 種類（**Tape Space Rack**、AU コード `aufx TSRk VtRk`）で、最大 8 台まで追加・複製・削除・並べ替えができます。AU（Mac）、VST3（Mac / Windows）、Standalone が作られます。レイテンシは 0 です。
 
-### ディレイのプリセット（20 種）
+### テンポ同期（SYNC）と精密な時間設定
+- ディレイの TIME、リバーブの PRE-DELAY・DECAY（RT60）・REVERSE LENGTH を、それぞれ独立にテンポへ同期できます。プラグインではホストの BPM に追従します（Standalone と Web 版は BPM を入力）。
+- 音符は **79 種**：None（同期なし）、1/64〜1/2 の 3 連符・通常・付点、1 小節の 3 連符・通常・付点、2・3・4 小節、4/3・5/4 小節、そして **n/64 刻み**（5/64〜63/64。約分できるものは 14/64 (7/32) のように併記）。
+- SYNC つまみの値をクリックすると、79 種を 4 列に並べた一覧が開きます。検索（「7/32」「dot」「trip」など）、QUICK JUMP（1/64・1/8・1 BAR・n/64・現在値）、矢印キー＋Enter で選べ、下の行に今の BPM での長さ（ms）が出ます。
+- 時間のつまみ（TIME、PRE-DELAY、DECAY、REVERSE LENGTH など）は、値をクリックすると数値を直接入力できます（例：`437.5`、`1.25 s`）。0.001 ms 単位で設定でき、同期中は同期後の長さを表示します。
+
+### ディレイのプリセット（23 種）
 高品位なデジタルからアナログまで用意しています。
-- **Digital HQ**：Quarter（Sync）、Dotted Eighth、Slapback、Wide Dual、Ping-Pong（8 分・3 連）、Reverse Swell、Reverse Ping-Pong、Telephone Echo（ウェット EQ）、Dark Ambient Wash、Ducked Vocal Echo
+- **Digital HQ**：Quarter（Sync）、Dotted Eighth、Slapback、Wide Dual、Ping-Pong（8 分・3 連）、Reverse Swell、Reverse Ping-Pong、Telephone Echo（ウェット EQ）、Dark Ambient Wash、Fine 5/16 Polyrhythm、Fine 7/32 Push、Bar-long Swell、Ducked Vocal Echo
 - **Tape Echo**：Single Head、Multi-Head、Runaway（発振ぎみ）、Rockabilly Slap
 - **Analog BBD**：Warm、Chorus-Echo、Long Murky
 - **Vintage Digital**：12-bit Rack、Digital Dub
 
-### リバーブのプリセット（19 種）
-アルゴリズム 9 種（Concert Hall、Large Hall、Small Room、Drum Room、Vocal Plate、Bright Plate、Chamber、Cathedral、Infinite Pad）、内蔵 IR 7 種、リバース 3 種（Reverse Hall Swell、Reverse Plate Lead-in、Reverse Church IR）。
+### リバーブのプリセット（21 種）
+アルゴリズム 9 種（Concert Hall、Large Hall、Small Room、Drum Room、Vocal Plate、Bright Plate、Chamber、Cathedral、Infinite Pad）、テンポ同期 2 種（Tempo Plate：残響 1 小節、Tempo Hall：プリディレイ 1/32・残響 2 小節）、内蔵 IR 7 種、リバース 3 種（Reverse Hall Swell〈1/2 拍同期〉、Reverse Plate Lead-in、Reverse Church IR〈1 小節同期〉）。
 
 ### テープのプリセット（13 種）／ラックプリセット（9 種）
 30 ips マスター、15 ips NAB / CCIR、マルチトラックのドラム、7.5 ips の飽和、3.75 ips ローファイ、カセット、バイアスのアンダー／オーバーなど。ラックプリセットはテープ → ディレイ → リバーブの組み合わせ（Modern Vocal、Dub Station、Reverse Dream、Church Ping-Pong など）です。DAW のプログラム一覧からも選べます。
@@ -99,7 +105,7 @@ cmake --build build --config Release
 `build\TapeSpaceRack_artefacts\Release\VST3\Tape Space Rack.vst3` を `C:\Program Files\Common Files\VST3` にコピーします。
 
 ## 確認済みのこと
-- C++ 版と Web 版の DSP 出力が一致すること（3 モジュール・64 設定、時間変更の途中切り替えを含めて差 −144 dB 以下）
+- C++ 版と Web 版の DSP 出力が一致すること（3 モジュール・75 設定、時間変更の途中切り替え・テンポ同期 [97.3 BPM] を含めて差 −144 dB 以下）。79 種の音符表も C++ と Web で完全に一致
 - 分割畳み込みが直接計算と一致し（−280 dB 以下）、遅延がゼロであること
 - アルゴリズム・リバーブの残響時間が設定どおりであること（0.5 / 2.2 / 6 秒、全モデルで誤差 2 % 以内）
 - ディレイの時間・テンポ同期・ピンポン・リバースが正しく並ぶこと、リバースのつなぎ目にクリックがないこと

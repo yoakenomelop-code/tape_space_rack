@@ -129,6 +129,27 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
 .lvl .bar { height: 8px; background: #111317; border-radius: 2px; position: relative; overflow: hidden; }
 .lvl .bar i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--good); }
 .lvl .bar.w i { background: var(--c-rev); }
+.knob .val.edit { cursor: text; text-decoration: underline dotted #5b6474; text-underline-offset: 3px; }
+.knob .val.pick { cursor: pointer; color: var(--c-time); text-decoration: underline dotted; text-underline-offset: 3px; }
+.knob input.num { width: 66px; font-family: var(--f-mono); font-size: 11.5px; text-align: center; background: #111317; border: 1px solid var(--accent); border-radius: 3px; padding: 0 2px; }
+.pk { position: fixed; inset: 0; background: rgba(8, 9, 11, .55); z-index: 50; display: grid; place-items: center; padding: 16px; }
+.pk[hidden] { display: none; }
+.pk-box { width: min(1180px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; background: #1b1c1e; border: 1px solid #3a3d42; border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,.6); overflow: hidden; }
+.pk-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #262729; border-bottom: 1px solid #333539; flex-wrap: wrap; }
+.pk-title { font-family: var(--f-display); font-weight: 700; letter-spacing: .08em; font-size: 15px; margin-right: 8px; }
+.pk-qj { font-family: var(--f-display); letter-spacing: .1em; font-size: 12px; color: var(--ink-dim); }
+.pk-head .btn { padding: 4px 10px; font-family: var(--f-mono); font-size: 12.5px; background: #2b2c2f; }
+.pk-search { margin-left: auto; width: 240px; background: #1b1c1e; border: 1px solid #45484d; border-radius: 999px; padding: 6px 14px; }
+.pk-x { font-size: 18px; line-height: 1; padding: 4px 10px !important; }
+.pk-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(20, auto); grid-auto-columns: minmax(0, 1fr); gap: 0 18px; padding: 12px 16px; overflow: auto; }
+.pi { all: unset; display: flex; gap: 8px; align-items: baseline; padding: 3px 8px; border-left: 3px solid transparent; border-radius: 2px; cursor: pointer; font-family: var(--f-mono); font-size: 13.5px; color: var(--ink); white-space: nowrap; }
+.pi .n { color: #7d8492; min-width: 2ch; }
+.pi:hover, .pi.cur { background: #24282e; }
+.pi.sel { background: #13313a; color: #6fe3f0; border-left-color: #43d3e6; }
+.pi.dim { opacity: .18; }
+.pk-foot { padding: 9px 16px; background: #262729; border-top: 1px solid #333539; font-family: var(--f-mono); font-size: 13.5px; min-height: 20px; display: flex; gap: 16px; }
+.pk-foot .n { color: #7d8492; }
+.pk-foot .ms { color: var(--ink-dim); margin-left: auto; }
 </style>
 </head>
 <body>
@@ -189,9 +210,25 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
     上から順に信号が流れます。同じモジュールを何台でも追加・複製でき、左端の ⠿ をドラッグするか ▲▼ で順番を入れ替えます。
     テープは 2 倍オーバーサンプリングで飽和させ、ディレイは 4 点エルミート補間（デジタル HQ は時間変更時にクロスフェード）、リバーブは 16 ライン FDN または遅延ゼロの分割畳み込み（倍精度）で処理します。
     リバーブの IR は内蔵 7 種のほか、WAV / AIFF などの音声ファイルを読み込めます（サンプルレートは自動で変換）。読み込んだ IR はこのページを閉じると消えるので、再度読み込んでください。
-    つまみはドラッグ（上下）・ホイール・矢印キーで操作、ダブルクリックで初期値、Shift で微調整。
+    ディレイの TIME、リバーブの PRE-DELAY・DECAY・REVERSE LENGTH は <b>SYNC</b> でテンポに同期でき、SYNC の値をクリックすると 79 種の音符（1/64〜4 小節、3 連符・付点、n/64 刻み）の一覧から選べます。
+    つまみはドラッグ（上下）・ホイール・矢印キーで操作、ダブルクリックで初期値、Shift で微調整。時間のつまみは値をクリックすると数値を直接入力できます（例：437.5、1.25 s）。
     各モジュールは往年の機材の動作を参考に独自に設計したもので、それらの機材のメーカーとは一切関係がありません。
   </footer>
+</div>
+
+ <div class="pk" id="picker" hidden>
+  <div class="pk-box" role="dialog" aria-modal="true" aria-label="音符の長さを選ぶ">
+    <div class="pk-head">
+      <span class="pk-title"></span>
+      <span class="pk-qj">QUICK JUMP</span>
+      <button class="btn" type="button" data-j="1">1/64</button><button class="btn" type="button" data-j="10">1/8</button><button class="btn" type="button" data-j="19">1 BAR</button>
+      <button class="btn" type="button" data-j="27">n/64</button><button class="btn" type="button" data-j="cur" title="現在の値へ">◎</button>
+      <input class="pk-search" type="search" placeholder="Search（例：7/32, dot, trip）" aria-label="検索">
+      <button class="btn pk-x" type="button" aria-label="閉じる">×</button>
+    </div>
+    <div class="pk-grid" role="listbox"></div>
+    <div class="pk-foot"></div>
+  </div>
 </div>
 
 <script id="presets-src" type="application/json">{
@@ -330,7 +367,7 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
     "name": "HQ Quarter (Sync)",
     "p": {
      "variant": 0,
-     "sync": 9,
+     "sync": 14,
      "feedback": 30
     }
    },
@@ -338,7 +375,7 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
     "name": "HQ Dotted Eighth",
     "p": {
      "variant": 0,
-     "sync": 7,
+     "sync": 12,
      "feedback": 40,
      "mix": 25
     }
@@ -358,7 +395,7 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
     "p": {
      "variant": 0,
      "stereo": 3,
-     "sync": 9,
+     "sync": 14,
      "ratioLR": 75,
      "feedback": 35
     }
@@ -368,7 +405,7 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
     "p": {
      "variant": 0,
      "stereo": 2,
-     "sync": 6,
+     "sync": 11,
      "feedback": 45
     }
    },
@@ -377,7 +414,7 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
     "p": {
      "variant": 0,
      "stereo": 2,
-     "sync": 5,
+     "sync": 10,
      "feedback": 40,
      "highcut": 8000
     }
@@ -398,7 +435,7 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
      "variant": 0,
      "reverse": 1,
      "stereo": 2,
-     "sync": 9,
+     "sync": 14,
      "feedback": 40,
      "mix": 35
     }
@@ -421,7 +458,7 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
     "name": "Dark Ambient Wash",
     "p": {
      "variant": 0,
-     "sync": 10,
+     "sync": 15,
      "feedback": 75,
      "highcut": 3000,
      "modDepth": 20,
@@ -515,7 +552,7 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
     "name": "Vintage Digital Dub",
     "p": {
      "variant": 3,
-     "sync": 10,
+     "sync": 15,
      "feedback": 70,
      "lowcut": 200,
      "highcut": 4000,
@@ -525,10 +562,42 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
     }
    },
    {
+    "name": "Fine 5/16 Polyrhythm",
+    "p": {
+     "variant": 0,
+     "sync": 38,
+     "feedback": 45,
+     "stereo": 2,
+     "mix": 25
+    }
+   },
+   {
+    "name": "Fine 7/32 Push",
+    "p": {
+     "variant": 0,
+     "sync": 33,
+     "feedback": 35,
+     "highcut": 9000,
+     "mix": 25
+    }
+   },
+   {
+    "name": "Bar-long Swell (1 bar)",
+    "p": {
+     "variant": 0,
+     "sync": 20,
+     "feedback": 40,
+     "reverse": 0,
+     "highcut": 6000,
+     "modDepth": 15,
+     "mix": 30
+    }
+   },
+   {
     "name": "Ducked Vocal Echo",
     "p": {
      "variant": 0,
-     "sync": 9,
+     "sync": 14,
      "feedback": 35,
      "duck": 70,
      "mix": 35,
@@ -684,7 +753,28 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
      "variant": 0,
      "decay": 3,
      "revLen": 1500,
+     "revSync": 17,
      "mix": 35
+    }
+   },
+   {
+    "name": "Tempo Plate (decay 1 bar)",
+    "p": {
+     "variant": 2,
+     "decaySync": 20,
+     "preSync": 2,
+     "er": 0,
+     "lowcut": 200,
+     "mix": 25
+    }
+   },
+   {
+    "name": "Tempo Hall (pre 1/32, decay 2 bars)",
+    "p": {
+     "variant": 0,
+     "decaySync": 22,
+     "preSync": 5,
+     "mix": 25
     }
    },
    {
@@ -706,6 +796,7 @@ footer.note { padding: 0 4px 12px; max-width: 88ch; }
      "irIndex": 5,
      "reverse": 1,
      "revLen": 2500,
+     "revSync": 20,
      "mix": 35
     }
    }
@@ -876,14 +967,34 @@ var TS = (function () {
   const TYPES = ['tape', 'delay', 'reverb'];
 
   // ---------------------------------------------------------------- positions / names
-  const SYNC = {
-    names: ['1/32', '1/16T', '1/16', '1/16.', '1/8T', '1/8', '1/8.', '1/4T', '1/4', '1/4.', '1/2T', '1/2', '1/2.', '1/1'],
-    beats: [0.125, 1 / 6, 0.25, 0.375, 1 / 3, 0.5, 0.75, 2 / 3, 1, 1.5, 4 / 3, 2, 3, 4],
-  };
+  // note values for tempo sync (index 0 = free time). Same order as the picker grid:
+  // 1/64 … 1/2 (triplet, straight, dotted), 1 bar (trip / straight / dotted), 2, 3, 4, 4/3, 5/4 bars, then every n/64 not listed above.
+  const NOTES = (() => {
+    const n = [{ name: 'None', beats: 0 }];
+    for (const d of [64, 32, 16, 8, 4, 2]) { const b = 4 / d; n.push({ name: `1/${d} Trip`, beats: b * 2 / 3 }, { name: `1/${d}`, beats: b }, { name: `1/${d} Dot`, beats: b * 1.5 }); }
+    n.push({ name: '1 Trip', beats: 8 / 3 }, { name: '1', beats: 4 }, { name: '1 Dot', beats: 6 }, { name: '2', beats: 8 }, { name: '3', beats: 12 }, { name: '4', beats: 16 },
+           { name: '4/3', beats: 16 / 3 }, { name: '5/4', beats: 5 });
+    const skip = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48], gcd = (a, b) => (b ? gcd(b, a % b) : a);
+    for (let k = 5; k < 64; k++) if (skip.indexOf(k) < 0) { const g = gcd(k, 64); n.push({ name: g > 1 ? `${k}/64 (${k / g}/${64 / g})` : `${k}/64`, beats: k / 16 }); }
+    return n;
+  })();
+  const SYNC = { names: NOTES.map((x) => x.name), beats: NOTES.map((x) => x.beats), count: NOTES.length };
+  const clampBpm = (bpm) => clamp(bpm || 120, 20, 300);
+  // length of note value idx in ms (null when idx is 0 = free)
+  const noteMs = (idx, bpm) => ((idx | 0) > 0 ? NOTES[clamp(idx | 0, 1, NOTES.length - 1)].beats * 60000 / clampBpm(bpm) : null);
+  // reverb times with tempo sync applied (pre-delay, decay, reverse length); the sync fields are cleared in the result
+  function resolveTimes(p, bpm) {
+    const q = Object.assign({}, p);
+    if ((p.preSync | 0) > 0) q.predelay = clamp(noteMs(p.preSync, bpm), 0, 2000);
+    if ((p.decaySync | 0) > 0) q.decay = clamp(noteMs(p.decaySync, bpm) / 1000, 0.1, 30);
+    if ((p.revSync | 0) > 0) q.revLen = clamp(noteMs(p.revSync, bpm), 100, 6000);
+    q.preSync = 0; q.decaySync = 0; q.revSync = 0;
+    return q;
+  }
   const SPEC = {
     tape: { variants: ['Studio 2-Track', 'Multitrack', 'Cassette'], speed: [3.75, 7.5, 15, 30], formula: ['Modern', 'Classic', 'Vintage'], eq: ['NAB', 'CCIR'] },
     delay: { variants: ['Digital HQ', 'Tape Echo', 'Analog BBD', 'Vintage Digital'], stereo: ['MONO', 'STEREO', 'PING-PONG', 'DUAL'],
-             heads: ['1', '2', '3', '1+2', '2+3', '1+3', '1+2+3'], headRatio: [1, 1.9, 2.8], maxTime: [4000, 1600, 1200, 2000] },
+             heads: ['1', '2', '3', '1+2', '2+3', '1+3', '1+2+3'], headRatio: [1, 1.9, 2.8], maxTime: [8000, 1600, 1200, 2000] },
     reverb: { variants: ['Hall', 'Room', 'Plate', 'Chamber', 'Cathedral'], source: ['ALGO', 'IR', 'USER IR'],
               irs: ['Concert Hall', 'Wood Room', 'Bright Plate', 'Stone Chamber', 'Vocal Booth', 'Large Church', 'Spring Tank'] },
   };
@@ -914,7 +1025,7 @@ var TS = (function () {
     drive: 0, speed: 15, eqStd: 0, formula: 0, bias: 0, wow: 0, flutter: 0, hiss: 0,
     time: 375, sync: 0, feedback: 35, stereo: 1, ratioLR: 75, lowcut: 80, highcut: 12000, modRate: 0.5, modDepth: 0, duck: 0, heads: 0,
     source: 0, irIndex: 0, predelay: 20, size: 100, decay: 2.2, hiMult: 0.55, loMult: 1.2, diffusion: 80, er: 50, modulation: 30, width: 100,
-    reverse: 0, revLen: 1500, irLen: 100,
+    reverse: 0, revLen: 1500, irLen: 100, preSync: 0, decaySync: 0, revSync: 0,
     eqLo: 0, eqMid: 0, eqMidF: 1500, eqHi: 0,
   };
   const DEFAULTS = {
@@ -1255,7 +1366,7 @@ var TS = (function () {
   }
   // render the algorithmic reverb's impulse response (used for reverse reverb in ALGO mode)
   function renderAlgoIR(p, fs, lenMs) {
-    const m = new Reverb(fs, true); m.setParams(Object.assign({}, p, { source: 0, reverse: 0, predelay: 0, mix: 100, width: 100, lowcut: 0, highcut: 0, output: 0, modulation: 0, eqLo: 0, eqMid: 0, eqHi: 0 }));
+    const m = new Reverb(fs, true); m.setParams(Object.assign({}, p, { source: 0, reverse: 0, predelay: 0, mix: 100, width: 100, lowcut: 0, highcut: 0, output: 0, modulation: 0, eqLo: 0, eqMid: 0, eqHi: 0, preSync: 0, decaySync: 0, revSync: 0 }));
     const n = Math.round(lenMs * fs / 1000), L = new Float32Array(n), R = new Float32Array(n);
     L[0] = R[0] = 1;
     for (let i = 0; i < n; i += 512) { const k = Math.min(512, n - i); m.process(L.subarray(i, i + k), R.subarray(i, i + k), k); }
@@ -1370,7 +1481,7 @@ var TS = (function () {
   // ================================================================ DELAY
   function delayMs(p, bpm) {
     const mode = clamp(p.variant | 0, 0, 3), max = SPEC.delay.maxTime[mode];
-    const t = (p.sync | 0) > 0 ? SYNC.beats[clamp((p.sync | 0) - 1, 0, SYNC.beats.length - 1)] * 60000 / clamp(bpm || 120, 20, 300) : num(p.time, 375);
+    const t = (p.sync | 0) > 0 ? noteMs(p.sync, bpm) : num(p.time, 375);
     return clamp(t, 1, p.reverse ? Math.min(max, REV_MAX) : max);
   }
   function bbdCutoff(ms) { return Math.min(9000, 0.45 * 4096 / (2 * ms / 1000)); }
@@ -1396,7 +1507,7 @@ var TS = (function () {
   class Delay {
     constructor(fs) {
       this.fs = fs; this.type = 'delay'; this.p = Object.assign({}, DEFAULTS.delay); this.bpm = 120;
-      this.N = pow2(Math.ceil(fs * 4.6) + 16); this.mask = this.N - 1;
+      this.N = pow2(Math.ceil(fs * 8.6) + 16); this.mask = this.N - 1;
       this.buf = [new Float64Array(this.N), new Float64Array(this.N)]; this.w = 0;
       this.loop = [[], []]; this.dc = [new DCBlock(fs), new DCBlock(fs)];
       this.weq = [[], []]; this.rloop = [[], []]; this.rn = 0;
@@ -1580,14 +1691,14 @@ var TS = (function () {
   }
   class Reverb {
     constructor(fs, offline) {
-      this.fs = fs; this.type = 'reverb'; this.p = Object.assign({}, DEFAULTS.reverb); this.offline = !!offline;
+      this.fs = fs; this.type = 'reverb'; this.p = Object.assign({}, DEFAULTS.reverb); this.offline = !!offline; this.bpm = 120;
       const maxLine = pow2(Math.ceil(123.7 * 1.65 * 2 * fs / 1000) + 64);
       this.lines = []; for (let k = 0; k < FDN_N; k++) this.lines.push(new Float64Array(maxLine));
       this.lmask = maxLine - 1; this.lw = 0;
       this.lp = []; this.hp = []; for (let k = 0; k < FDN_N; k++) { this.lp.push(new Biquad()); this.hp.push(new Biquad()); }
       this.v = new Float64Array(FDN_N); this.lphase = new Float64Array(FDN_N); this.ldph = new Float64Array(FDN_N);
       for (let k = 0; k < FDN_N; k++) { this.lphase[k] = k * 0.71; this.ldph[k] = 2 * PI * (0.13 + 0.061 * k) / fs; }
-      this.PN = pow2(Math.ceil(0.5 * fs) + 8); this.pmask = this.PN - 1; this.pre = [new Float64Array(this.PN), new Float64Array(this.PN)]; this.pw = 0;
+      this.PN = pow2(Math.ceil(2.05 * fs) + 8); this.pmask = this.PN - 1; this.pre = [new Float64Array(this.PN), new Float64Array(this.PN)]; this.pw = 0;
       this.ap = [[], []]; this.erN = pow2(Math.ceil(0.2 * fs * 1.7) + 8); this.erMask = this.erN - 1; this.erBuf = new Float64Array(this.erN); this.erW = 0;
       this.erLP = [new Biquad(), new Biquad()];
       this.eq = [[], []]; this.dc = [new DCBlock(fs), new DCBlock(fs)];
@@ -1597,9 +1708,10 @@ var TS = (function () {
     }
     setParams(o) { Object.assign(this.p, o); this.update(); }
     usesIR() { const p = this.p; return (p.source | 0) > 0 || !!p.reverse; }
+    setBpm(b) { if (b !== this.bpm) { this.bpm = b; this.update(); } }
     // key of everything the IR depends on (the host builds the IR off the audio thread and calls setIR)
     irKey() {
-      const p = this.p;
+      const p = resolveTimes(this.p, this.bpm);
       if (!this.usesIR()) return '';
       const base = (p.source | 0) === 0 ? ['algo', p.variant, p.size, p.decay, p.hiMult, p.loMult, p.diffusion, p.er] : (p.source | 0) === 1 ? ['ir', p.irIndex] : ['user'];
       return base.concat([p.irLen, p.reverse, p.reverse ? p.revLen : 0]).join('/');
@@ -1610,8 +1722,8 @@ var TS = (function () {
       this.conv = c;
     }
     update() {
-      const p = this.p, fs = this.fs, V = VARIANT[clamp(p.variant | 0, 0, 4)];
-      this.preD = clamp(num(p.predelay, 20), 0, 490) * fs / 1000;
+      const p = resolveTimes(this.p, this.bpm), fs = this.fs, V = VARIANT[clamp(p.variant | 0, 0, 4)];
+      this.preD = clamp(num(p.predelay, 20), 0, 2000) * fs / 1000;
       this.lens = fdnLengths(p, fs);
       for (let k = 0; k < FDN_N; k++) {
         const G = lineGains(this.lens[k], p, fs);
@@ -1753,9 +1865,9 @@ var TS = (function () {
     return [outL, outR];
   }
   // reverb: energy envelope (dB) per bin of the wet response to a click
-  function reverbEnvelope(p, irLR, durMs, binMs, fs) {
+  function reverbEnvelope(p, irLR, durMs, binMs, fs, bpm) {
     fs = fs || 24000;
-    const m = new Reverb(fs, false); m.setParams(Object.assign({}, p, { mix: 100, output: 0 }));
+    const m = new Reverb(fs, false); m.bpm = bpm || 120; m.setParams(Object.assign({}, p, { mix: 100, output: 0 }));
     if (m.usesIR() && irLR) m.setIR(irLR[0], irLR[1]);
     const n = Math.round(fs * durMs / 1000), step = Math.max(1, Math.round(fs * binMs / 1000));
     const L = new Float32Array(step), R = new Float32Array(step), env = [];
@@ -1808,8 +1920,8 @@ var TS = (function () {
     return freqs.map((f) => secsMagDb(s, fs, f));
   }
   // the IR a reverb module needs (or null): built-in / user (passed in) / rendered algorithm, then trim + reverse
-  function buildIR(p, fs, userIR) {
-    const src = (p.source | 0);
+  function buildIR(p0, fs, userIR, bpm) {
+    const p = resolveTimes(p0, bpm), src = (p.source | 0);
     if (src === 0 && !p.reverse) return null;
     let raw;
     if (src === 1) raw = synthIR(p.irIndex | 0, fs);
@@ -1819,7 +1931,7 @@ var TS = (function () {
     return prepareIR(raw, p, fs);
   }
 
-  return { TYPES, SPEC, SYNC, CIRCUIT, DEFAULTS, REF, Rack, create, Convolver, synthIR, prepareIR, buildIR, renderAlgoIR, normalizeIR,
+  return { TYPES, SPEC, SYNC, NOTES, noteMs, resolveTimes, CIRCUIT, DEFAULTS, REF, Rack, create, Convolver, synthIR, prepareIR, buildIR, renderAlgoIR, normalizeIR,
            echoPattern, reverbEnvelope, design3Band, designDelayLoop, designWetEQ, tapeCurve, tapeLevelResponse, harmonics, responseTone, rtCurve, delayMs, fdnLengths,
            halfbandCoefs, Halfband, fft, rfft, irfft, dbToLin, linToDb, bqMagDb, secsMagDb, designTapeTone, IRSPEC };
 })();
@@ -1860,14 +1972,14 @@ let uidSeq = 1;
 const newSlot = (type, p) => ({ uid: 's' + (uidSeq++), type, on: true, p: Object.assign({}, TS.DEFAULTS[type], p || {}) });
 let state = { slots: [newSlot('tape', modPreset('tape', 'Warm 15 ips NAB')), newSlot('delay', modPreset('delay', 'HQ Dotted Eighth')), newSlot('reverb', modPreset('reverb', 'Concert Hall'))], bypass: false, range: 24, open: {}, bpm: 100 };
 try {
-  const s = JSON.parse(localStorage.getItem('tape-space-rack-v1'));
+  const s = JSON.parse(localStorage.getItem('tape-space-rack-v2'));
   if (s && Array.isArray(s.slots)) {
     state.slots = s.slots.filter((x) => TS.DEFAULTS[x.type]).map((x) => Object.assign(newSlot(x.type, x.p), { on: x.on !== false }));
     state.slots.forEach((x) => { if ((x.p.source | 0) === 2) x.p.source = 1; });     // a user IR is not kept between visits
     state.range = s.range || 24; state.bpm = s.bpm || 100;
   }
 } catch (e) {}
-const save = () => { try { localStorage.setItem('tape-space-rack-v1', JSON.stringify({ slots: state.slots, range: state.range, bpm: state.bpm })); } catch (e) {} };
+const save = () => { try { localStorage.setItem('tape-space-rack-v2', JSON.stringify({ slots: state.slots, range: state.range, bpm: state.bpm })); } catch (e) {} };
 const slotOf = (uid) => state.slots.find((s) => s.uid === uid);
 const slotNo = (s) => state.slots.indexOf(s) + 1;
 $('#bpmIn').value = state.bpm;
@@ -1997,7 +2109,7 @@ $('#abBtn').addEventListener('click', () => {
   $('#abBtn').textContent = state.bypass ? 'A/B 原音（再生中）' : 'A/B 原音'; post({ t: 'bypass', v: state.bypass });
 });
 function setBpm(v) { v = Math.max(40, Math.min(240, +v || 100)); state.bpm = +v.toFixed(1); $('#bpmIn').value = state.bpm; post({ t: 'bpm', v: state.bpm }); save();
-  state.slots.forEach((s) => { if (s.type === 'delay') requestPreview(s.uid); }); drawGraph(); }
+  state.slots.forEach((s) => { if (s.type !== 'tape') requestPreview(s.uid); if (s.type === 'reverb') syncIR(s); }); drawGraph(); buildRackSoon(); }
 $('#bpmIn').addEventListener('change', (e) => setBpm(e.target.value));
 let taps = [];
 $('#tapBtn').addEventListener('click', () => { const t = performance.now(); taps = taps.filter((x) => t - x < 2500); taps.push(t);
@@ -2009,7 +2121,7 @@ const irSent = {};      // uid -> key sent to the engine
 const irPrev = {};      // uid -> { key, ir } at the preview rate
 const irTimers = {};
 function irKeyOf(s) {
-  const p = s.p; if (!((p.source | 0) > 0 || p.reverse)) return '';
+  const p = TS.resolveTimes(s.p, state.bpm); if (!((p.source | 0) > 0 || p.reverse)) return '';
   const src = p.source | 0;
   const base = src === 0 ? ['algo', p.variant, p.size, p.decay, p.hiMult, p.loMult, p.diffusion, p.er] : src === 1 ? ['ir', p.irIndex] : ['user', userIR[s.uid] ? userIR[s.uid].name : '-'];
   return base.concat([p.irLen, p.reverse, p.reverse ? p.revLen : 0]).join('/');
@@ -2021,7 +2133,7 @@ function syncIR(s) {
   clearTimeout(irTimers[s.uid]);
   irTimers[s.uid] = setTimeout(() => {
     if (!ctx || irKeyOf(s) !== key) return;
-    const u = userIR[s.uid], ir = TS.buildIR(s.p, ctx.sampleRate, u ? [u.L, u.R] : null);
+    const u = userIR[s.uid], ir = TS.buildIR(s.p, ctx.sampleRate, u ? [u.L, u.R] : null, state.bpm);
     if (!ir) return;
     irSent[s.uid] = key; post({ t: 'ir', uid: s.uid, L: ir[0], R: ir[1] }, local ? [] : [ir[0].buffer, ir[1].buffer]);
   }, 120);
@@ -2032,7 +2144,7 @@ function previewIR(s) {           // IR at the preview rate (24 kHz) for the dec
   let user = null;
   if ((s.p.source | 0) === 2 && userIR[s.uid]) { const u = userIR[s.uid], k = Math.max(1, Math.round(u.fs / 24000)), n = Math.floor(u.L.length / k); user = [new Float32Array(n), new Float32Array(n)];
     for (let i = 0; i < n; i++) { let a = 0, b = 0; for (let j = 0; j < k; j++) { a += u.L[i * k + j]; b += u.R[i * k + j]; } user[0][i] = a / k; user[1][i] = b / k; } }
-  const ir = TS.buildIR(s.p, 24000, user); irPrev[s.uid] = { key, ir }; return ir;
+  const ir = TS.buildIR(s.p, 24000, user, state.bpm); irPrev[s.uid] = { key, ir }; return ir;
 }
 let irTarget = null;
 $('#irIn').addEventListener('change', async (e) => {
@@ -2067,7 +2179,7 @@ function knob(o) {
     <line class="ptr" x1="26" y1="26" x2="26" y2="12" stroke="#f2f3f5" stroke-width="2.5" stroke-linecap="round"/></svg>
     <div class="lab">${o.label}</div><div class="val"></div>`;
   const get = o.log ? () => Math.log(o.get()) : o.get;
-  const set = o.log ? (v) => o.set(+Math.exp(v).toPrecision(4)) : o.set;
+  const set = o.log ? (v) => o.set(+Math.exp(v).toPrecision(6)) : o.set;
   const lo = o.list ? 0 : (o.log ? Math.log(o.min) : o.min), hi = o.list ? o.list.length - 1 : (o.log ? Math.log(o.max) : o.max);
   const st = o.list ? 1 : (o.log ? 0 : (o.step || 0));
   const A0 = -135, A1 = 135, R = 23;
@@ -2097,6 +2209,26 @@ function knob(o) {
   el.addEventListener('keydown', (e) => { const d = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key]; if (d) { e.preventDefault(); setV(get() + d * (st || (hi - lo) / 100)); } });
   el.addEventListener('pointerenter', hover); el.addEventListener('focus', hover);
   el.addEventListener('pointerleave', () => { if (!drag) setHint(null); });
+  // click the value: a list knob with a picker opens it; a continuous knob takes a typed number (exact value)
+  const valEl = el.querySelector('.val');
+  if (o.pick) valEl.classList.add('pick'); else if (!o.list) valEl.classList.add('edit');
+  valEl.addEventListener('pointerdown', (e) => e.stopPropagation());
+  valEl.addEventListener('click', (e) => {
+    e.stopPropagation(); if (o.disabled) return;
+    if (o.pick) { o.pick(); return; }
+    if (o.list) return;
+    const inp = document.createElement('input'); inp.className = 'num'; inp.type = 'text'; inp.inputMode = 'decimal';
+    inp.value = String(+(+o.get()).toPrecision(7)); valEl.replaceWith(inp); inp.focus(); inp.select();
+    let done = false;
+    const finish = (ok) => { if (done) return; done = true;
+      if (ok) { let v = parseFloat(inp.value.replace(',', '.')); const u = inp.value.trim().toLowerCase();
+        if (o.unit === 'ms' && /[0-9.]\s*s$/.test(u) && !/ms$/.test(u)) v *= 1000;           // "1.25 s" → 1250 ms
+        if (isFinite(v)) { o.set(Math.max(o.min, Math.min(o.max, v))); } }
+      inp.replaceWith(valEl); render(); hover(); };
+    inp.addEventListener('keydown', (ev) => { ev.stopPropagation(); if (ev.key === 'Enter') finish(true); if (ev.key === 'Escape') finish(false); });
+    inp.addEventListener('blur', () => finish(true));
+    inp.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+  });
   el.render = render; render();
   return el;
 }
@@ -2132,6 +2264,47 @@ const col = (...kids) => { const d = document.createElement('div'); d.className 
 const hz = (f) => f >= 1000 ? +(f / 1000).toFixed(f >= 10000 ? 1 : 2) + ' kHz' : Math.round(f) + ' Hz';
 const sdb = (d) => (d > 0 ? '+' : '') + (+d).toFixed(1) + ' dB';
 const fmtT = (ms) => ms < 1 ? Math.round(ms * 1000) + ' µs' : ms < 1000 ? +ms.toFixed(ms < 10 ? 1 : 0) + ' ms' : +(ms / 1000).toFixed(ms < 10000 ? 1 : 0) + ' s';
+// ------------------------------------------------------------------ note-value picker (tempo sync)
+const PK = { el: $('#picker'), grid: $('#picker .pk-grid'), foot: $('#picker .pk-foot'), search: $('#picker .pk-search'), cur: 0, on: null, get: null, items: [] };
+const noteText = (i) => i === 0 ? 'None（FREE）' : TS.SYNC.names[i];
+function pkFoot(i) {
+  const ms = TS.noteMs(i, state.bpm);
+  PK.foot.innerHTML = `<span class="n">${String(i + 1).padStart(2, '0')}</span><span>${noteText(i)}</span><span class="ms">${ms === null ? 'テンポ同期なし（ミリ秒で設定）' : `${fmtMs(ms)} @ ${state.bpm} BPM`}</span>`;
+}
+// precise time display (trailing zeros dropped): 12.345 ms, 437.5 ms, 1.2345 s
+const fmtP = (ms) => ms < 1000 ? (+ms.toFixed(ms < 100 ? 3 : 2)) + ' ms' : (+(ms / 1000).toFixed(4)) + ' s';
+const fmtMs = (ms) => ms >= 1000 ? (+(ms / 1000).toFixed(4)) + ' s（' + (+ms.toFixed(2)) + ' ms）' : (+ms.toFixed(3)) + ' ms';
+function pkMark(i) { PK.cur = i; PK.items.forEach((b, k) => b.classList.toggle('cur', k === i)); pkFoot(i); const b = PK.items[i]; if (b && b.scrollIntoView) b.scrollIntoView({ block: 'nearest' }); }
+function openPicker(title, get, set) {
+  PK.get = get; PK.on = set; PK.el.querySelector('.pk-title').textContent = title;
+  PK.grid.innerHTML = ''; PK.search.value = '';
+  PK.items = TS.SYNC.names.map((n, i) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pi' + (i === get() ? ' sel' : ''); b.setAttribute('role', 'option');
+    b.innerHTML = `<span class="n">${String(i + 1).padStart(2, '0')}</span>${i === 0 ? 'None' : n}`;
+    b.addEventListener('pointerenter', () => pkMark(i)); b.addEventListener('click', () => pkPick(i)); PK.grid.append(b); return b; });
+  PK.grid.style.gridTemplateRows = `repeat(${Math.ceil(TS.SYNC.count / 4)}, auto)`;
+  PK.el.hidden = false; pkMark(get()); PK.search.focus();
+}
+function pkPick(i) { const f = PK.on; closePicker(); if (f) f(i); }
+function closePicker() { PK.el.hidden = true; PK.on = null; }
+PK.el.addEventListener('pointerdown', (e) => { if (e.target === PK.el) closePicker(); });
+PK.el.querySelector('.pk-x').addEventListener('click', closePicker);
+PK.el.querySelectorAll('[data-j]').forEach((b) => b.addEventListener('click', () => { pkMark(b.dataset.j === 'cur' ? PK.get() : +b.dataset.j); PK.search.focus(); }));
+PK.search.addEventListener('input', () => {
+  const q = PK.search.value.trim().toLowerCase().replace(/\s+/g, ' ');
+  let first = -1;
+  const has = (t) => { let k = t.indexOf(q); while (k >= 0) { if (k === 0 || ' ('.includes(t[k - 1])) return true; k = t.indexOf(q, k + 1); } return false; };
+  PK.items.forEach((b, i) => { const hit = !q || has(noteText(i).toLowerCase()) || String(i + 1).padStart(2, '0') === q || String(i + 1) === q;
+    b.classList.toggle('dim', !hit); if (hit && first < 0) first = i; });
+  if (first >= 0) pkMark(first);
+});
+PK.el.addEventListener('keydown', (e) => {
+  const n = TS.SYNC.count, rows = Math.ceil(n / 4);
+  const mv = { ArrowDown: 1, ArrowUp: -1, ArrowRight: rows, ArrowLeft: -rows }[e.key];
+  if (mv) { e.preventDefault(); pkMark(Math.max(0, Math.min(n - 1, PK.cur + mv))); }
+  else if (e.key === 'Enter') { e.preventDefault(); pkPick(PK.cur); }
+  else if (e.key === 'Escape') { e.preventDefault(); closePicker(); }
+});
+let rackTimer = 0; const buildRackSoon = () => { clearTimeout(rackTimer); rackTimer = setTimeout(buildRack, 60); };
 const nearest = (list, v) => list.reduce((bi, x, i) => Math.abs(x - v) < Math.abs(list[bi] - v) ? i : bi, 0);
 const pctf = (v) => Math.round(v) + ' %';
 
@@ -2154,7 +2327,8 @@ function ctl(s) {
   const H = {}; for (const b of ['tape', 'motion', 'time', 'delay', 'eq', 'rev', 'mix', 'analog']) H[b] = { uid: U, band: b };
   const set = (k) => (v) => { p[k] = v; changed(s); }, get = (k) => () => p[k];
   const lin = (k, label, min, max, step, fmt, hl, desc, extra) => knob(Object.assign({ label, hl, min, max, step, get: get(k), set: set(k), def: D[k], fmt, desc }, extra || {}));
-  const logk = (k, label, min, max, fmt, hl, desc, extra) => knob(Object.assign({ label, hl, log: true, contMark: false, min, max, get: () => Math.max(min, Math.min(max, p[k])), set: set(k), def: D[k], fmt, desc }, extra || {}));
+  const unitOf = { time: 'ms', predelay: 'ms', revLen: 'ms' };
+  const logk = (k, label, min, max, fmt, hl, desc, extra) => knob(Object.assign({ label, hl, log: true, contMark: false, min, max, unit: unitOf[k], get: () => Math.max(min, Math.min(max, p[k])), set: set(k), def: D[k], fmt, desc }, extra || {}));
   const mixKnob = (what) => lin('mix', 'Mix', 0, 100, 1, pctf, H.mix, () => `MIX：原音と${what}のバランス。現在 ${p.mix} %（50 % で原音・${what}とも 100 %）`);
   const outKnob = () => lin('output', 'Output', -24, 24, 0.5, sdb, H.mix, () => `OUTPUT：最終出力レベル ${sdb(p.output)}`);
   const eqGroup = (hl, where) => group('WET EQ', hl, [
@@ -2162,7 +2336,13 @@ function ctl(s) {
     lin('eqMid', 'Mid', -12, 12, 0.5, sdb, hl, () => `WET EQ MID：${where}の ${hz(p.eqMidF)} 付近をピーキングで ${sdb(p.eqMid)}`),
     logk('eqMidF', 'Mid Freq', 200, 8000, hz, hl, () => `WET EQ MID FREQ：${hz(p.eqMidF)}`),
     lin('eqHi', 'High', -12, 12, 0.5, sdb, hl, () => `WET EQ HIGH：${where}の 6 kHz 以上をシェルビングで ${sdb(p.eqHi)}`)]);
-  return { p, H, set, get, lin, logk, mixKnob, outKnob, eqGroup };
+  // tempo-sync knob (79 note values); clicking its value opens the picker grid
+  const syncKnob = (k, label, hl, title, what) => knob({ label, hl, list: TS.SYNC.names.map((n, i) => (i ? n : 'FREE')), get: () => p[k] | 0, def: 0,
+    set: (i) => { p[k] = i; changed(s); buildRackSoon(); },
+    fmt: (i) => (i | 0) ? TS.SYNC.names[i | 0].replace(/ \(.*\)$/, '') : 'FREE',
+    pick: () => openPicker(title, () => p[k] | 0, (i) => { p[k] = i; changed(s); buildRack(); setHint(hl, `${title}：${noteText(i)}${i ? ' = ' + fmtMs(TS.noteMs(i, state.bpm)) : ''}`); }),
+    desc: () => (p[k] | 0) ? `${what}：${TS.SYNC.names[p[k]]} = ${fmtMs(TS.noteMs(p[k], state.bpm))}（${state.bpm} BPM）。値をクリックすると 79 種の一覧から選べます` : `${what}：FREE（ミリ秒で設定）。値をクリックすると 79 種の音符の一覧から選べます（3 連符・付点・n/64 など）` });
+  return { p, H, set, get, lin, logk, mixKnob, outKnob, eqGroup, syncKnob };
 }
 const cutFmt = (lo) => (v) => (lo ? v < 20 : v >= 20000) ? 'OFF' : hz(v);
 
@@ -2191,10 +2371,9 @@ const builders = {
     const ms = TS.delayMs(p, state.bpm);
     box.append(
       group('TIME', c.H.time, [
-        c.logk('time', 'Time', 1, max, fmtT, c.H.time, () => synced ? `TIME：テンポ同期中（${TS.SYNC.names[p.sync - 1]} = ${fmtT(ms)} @ ${state.bpm} BPM）` : `TIME：${fmtT(p.time)}（最大 ${fmtT(max)}）`,
-          { disabled: synced, fmt: () => fmtT(ms) }),
-        knob({ label: 'Sync', hl: c.H.time, list: ['FREE'].concat(TS.SYNC.names), get: () => p.sync | 0, set: (i) => { p.sync = i; changed(s); buildRack(); }, def: 0,
-          desc: () => (p.sync | 0) ? `SYNC：${TS.SYNC.names[p.sync - 1]}（T＝3 連符、. ＝付点）= ${fmtT(ms)}。テンポは上の BPM（プラグインではホストのテンポ）` : 'SYNC：FREE（ミリ秒で自由に設定）' }),
+        c.logk('time', 'Time', 1, max, fmtP, c.H.time, () => synced ? `TIME：テンポ同期中（${TS.SYNC.names[p.sync]} = ${fmtMs(ms)} @ ${state.bpm} BPM）${TS.noteMs(p.sync, state.bpm) > max ? '。最大 ' + fmtT(max) + ' で頭打ち' : ''}` : `TIME：${fmtMs(p.time)}（最大 ${fmtT(max)}）。値をクリックすると 0.001 ms 単位で数値入力できます`,
+          { disabled: synced, fmt: () => fmtP(ms) }),
+        c.syncKnob('sync', 'Sync', c.H.time, 'DELAY TIME SYNC', 'SYNC'),
         p.stereo === 3 ? c.lin('ratioLR', 'R / L', 10, 200, 1, pctf, c.H.time, () => `R / L：右チャンネルの時間を左の ${p.ratioLR} %（${fmtT(ms * p.ratioLR / 100)}）に`) : null,
         mode === 1 ? seg('Heads', S.heads, c.get('heads'), (i) => { p.heads = i; changed(s); }, c.H.time, (i) => `PLAYBACK HEADS ${S.heads[i]}：再生ヘッドの組み合わせ（ヘッド 2・3 はヘッド 1 の 1.9 倍・2.8 倍の距離）。複数ヘッドでリズミカルな反復`) : null]),
       group('REPEATS', c.H.delay, [
@@ -2215,7 +2394,7 @@ const builders = {
       group('OUT', c.H.mix, [c.mixKnob('エコー'), c.outKnob()]));
   },
   reverb(s, box) {
-    const c = ctl(s), p = c.p, S = SPEC.reverb, src = p.source | 0, algo = src === 0;
+    const c = ctl(s), p = c.p, S = SPEC.reverb, src = p.source | 0, algo = src === 0, R = () => TS.resolveTimes(p, state.bpm);
     const irBox = document.createElement('div'); irBox.className = 'irsel';
     if (src === 1) {
       irBox.innerHTML = `<div class="lab">Impulse</div><select class="btn small">${S.irs.map((n, i) => `<option value="${i}" ${(p.irIndex | 0) === i ? 'selected' : ''}>${n}</option>`).join('')}</select>`;
@@ -2233,9 +2412,13 @@ const builders = {
         irBox,
         !algo ? c.lin('irLen', 'Length', 5, 100, 1, pctf, c.H.rev, () => `IR LENGTH：IR の長さを ${p.irLen} % に切り詰める（末尾はフェード）。残響を短くしたいとき`) : null]),
       group('SPACE', c.H.rev, [
-        c.lin('predelay', 'Pre-delay', 0, 250, 1, (v) => v + ' ms', c.H.rev, () => `PRE-DELAY：直接音から残響が始まるまで ${p.predelay} ms。原音と残響を分離して明瞭に`),
+        c.logk('predelay', 'Pre-delay', 0.1, 1000, (v) => (v < 0.15 ? '0 ms' : fmtP(v)), c.H.rev, () => (p.preSync | 0) ? `PRE-DELAY：テンポ同期中（${TS.SYNC.names[p.preSync]} = ${fmtMs(R().predelay)}）` : `PRE-DELAY：直接音から残響が始まるまで ${fmtMs(p.predelay)}。値をクリックで数値入力`,
+          { disabled: (p.preSync | 0) > 0, fmt: () => (R().predelay < 0.15 ? '0 ms' : fmtP(R().predelay)) }),
+        c.syncKnob('preSync', 'Sync', c.H.rev, 'PRE-DELAY SYNC', 'PRE-DELAY SYNC'),
         algo ? c.lin('size', 'Size', 20, 200, 1, pctf, c.H.rev, () => `SIZE：空間の大きさ ${p.size} %（ディレイラインと初期反射の長さ）`) : null,
-        algo ? c.logk('decay', 'Decay', 0.1, 30, (v) => (+v).toFixed(v < 10 ? 2 : 1) + ' s', c.H.rev, () => `DECAY：中域の残響時間（RT60）${(+p.decay).toFixed(2)} 秒`) : null,
+        algo ? c.logk('decay', 'Decay', 0.1, 30, (v) => (+(+v).toFixed(3)) + ' s', c.H.rev, () => (p.decaySync | 0) ? `DECAY：テンポ同期中（RT60 = ${TS.SYNC.names[p.decaySync]} = ${(+R().decay).toFixed(3)} 秒）` : `DECAY：中域の残響時間（RT60）${(+p.decay).toFixed(3)} 秒。値をクリックで数値入力`,
+          { disabled: (p.decaySync | 0) > 0, fmt: () => (+(+R().decay).toFixed(3)) + ' s' }) : null,
+        algo ? c.syncKnob('decaySync', 'Sync', c.H.rev, 'DECAY SYNC（RT60）', 'DECAY SYNC') : null,
         algo ? c.logk('loMult', 'Low ×', 0.25, 4, (v) => '×' + (+v).toFixed(2), c.H.rev, () => `LOW ×：250 Hz 以下の残響時間を中域の ${(+p.loMult).toFixed(2)} 倍に（大きいほど低域が長く残る）`) : null,
         algo ? c.logk('hiMult', 'High ×', 0.05, 2, (v) => '×' + (+v).toFixed(2), c.H.rev, () => `HIGH ×：3.5 kHz 以上の残響時間を中域の ${(+p.hiMult).toFixed(2)} 倍に（小さいほど空気吸収で暗い）`) : null]),
       algo ? group('CHARACTER', c.H.rev, [
@@ -2244,7 +2427,9 @@ const builders = {
         c.lin('modulation', 'Mod', 0, 100, 1, pctf, c.H.rev, () => `MODULATION：ディレイラインの揺れ ${p.modulation} %。金属的な響きを消してなめらかに（コーラス感）`)]) : null,
       group('REVERSE', c.H.rev, [
         col(toggle('REVERSE', c.get('reverse'), (v) => { p.reverse = v; changed(s); buildRack(); }, c.H.rev, () => p.reverse ? `REVERSE オン：残響を時間反転した“吸い込む”リバーブ。音の後ろで ${fmtT(p.revLen)} かけて膨らみ、ぷつっと切れる${algo ? '（ALGO はアルゴリズムの応答をそのまま反転して畳み込み）' : ''}` : 'REVERSE：オンでリバース・リバーブ')),
-        p.reverse ? c.lin('revLen', 'Length', 100, 6000, 10, fmtT, c.H.rev, () => `REVERSE LENGTH：吸い込みの長さ ${fmtT(p.revLen)}。テンポに合わせると効果的（1 拍 = ${fmtT(60000 / state.bpm)}）`) : null]),
+        p.reverse ? c.logk('revLen', 'Length', 100, 6000, fmtP, c.H.rev, () => (p.revSync | 0) ? `REVERSE LENGTH：テンポ同期中（${TS.SYNC.names[p.revSync]} = ${fmtMs(R().revLen)}）` : `REVERSE LENGTH：吸い込みの長さ ${fmtMs(p.revLen)}。値をクリックで数値入力（1 拍 = ${fmtMs(60000 / state.bpm)}）`,
+          { disabled: (p.revSync | 0) > 0, fmt: () => fmtP(R().revLen) }) : null,
+        p.reverse ? c.syncKnob('revSync', 'Sync', c.H.rev, 'REVERSE LENGTH SYNC', 'REVERSE SYNC') : null]),
       group('WET CUT', c.H.eq, [
         c.logk('lowcut', 'Low Cut', 19.9, 1000, cutFmt(true), c.H.eq, () => `LOW CUT：残響の低域を削る（${cutFmt(true)(p.lowcut)}）。濁り防止。左端で OFF`),
         c.logk('highcut', 'High Cut', 1000, 20000, cutFmt(false), c.H.eq, () => `HIGH CUT：残響の高域を削る（${cutFmt(false)(p.highcut)}）。右端で OFF`)]),
@@ -2284,8 +2469,9 @@ function requestPreview(uid) {
     else if (s.type === 'delay') { const ms = TS.delayMs(p, state.bpm); pv.dur = Math.min(8000, Math.max(1500, ms * (p.feedback > 60 ? 12 : 7) + (p.reverse ? ms * 2 : 0))); pv.ms = ms;
       pv.pat = TS.echoPattern(p, state.bpm, pv.dur, pv.dur / 330, 24000); }
     else {
+      Object.assign(p, TS.resolveTimes(p, state.bpm));
       const algo = !(p.source | 0) && !p.reverse;
-      if (algo) { pv.dur = Math.min(12000, Math.max(1200, p.decay * 1300 + p.predelay)); pv.env = TS.reverbEnvelope(p, null, pv.dur, pv.dur / 330, 24000); }
+      if (algo) { pv.dur = Math.min(12000, Math.max(1200, p.decay * 1300 + p.predelay)); pv.env = TS.reverbEnvelope(p, null, pv.dur, pv.dur / 330, 24000, state.bpm); }
       else { const ir = previewIR(s); if (ir) { const n = ir[0].length, pre = Math.round(p.predelay * 24), bins = 330; pv.dur = (n + pre) / 24; const step = (n + pre) / bins; pv.env = [];
         for (let b = 0; b < bins; b++) { let e = 0, k = 0; for (let i = Math.floor(b * step) - pre; i < Math.floor((b + 1) * step) - pre; i++, k++) if (i >= 0 && i < n) e += ir[0][i] * ir[0][i] + ir[1][i] * ir[1][i]; pv.env.push(10 * Math.log10(e / Math.max(1, 2 * k) + 1e-14)); }
         pv.wave = []; const ws = n / 150; for (let b = 0; b < 150; b++) { let a = 0, c = 0; for (let i = Math.floor(b * ws); i < Math.floor((b + 1) * ws); i++) { a = Math.max(a, ir[0][i]); c = Math.min(c, ir[0][i]); } pv.wave.push([a, c]); } } }
@@ -2325,7 +2511,7 @@ function drawViews(s) {
     for (let i = 0; i < n; i++) { const a = h(L[i]), b = h(R[i]); if (a > 0) g.fillRect(i * bw, mid - a, Math.max(1.5, bw), a); if (b > 0) g.fillRect(i * bw, mid, Math.max(1.5, bw), b); }
     g.fillStyle = '#e7e9ee'; g.fillRect(0, 6, 3, H - 12);
     g.fillStyle = '#9097a5'; font(g, 18); g.textAlign = 'left'; g.fillText('L', W - 22, 22); g.fillText('R', W - 22, H - 10); g.textAlign = 'right'; g.fillText(fmtT(pv.dur), W - 34, H - 10);
-    f.querySelector('.info').textContent = `${fmtT(pv.ms)}${(s.p.sync | 0) ? ' (' + TS.SYNC.names[s.p.sync - 1] + ')' : ''} · ${SPEC.delay.stereo[s.p.stereo | 0]}${s.p.reverse ? ' · REVERSE' : ''}`;
+    f.querySelector('.info').textContent = `${fmtT(pv.ms)}${(s.p.sync | 0) ? ' (' + TS.SYNC.names[s.p.sync] + ')' : ''} · ${SPEC.delay.stereo[s.p.stereo | 0]}${s.p.reverse ? ' · REVERSE' : ''}`;
   } else {
     let f = fig('env');
     if (f && pv.env) { const cv = f.querySelector('canvas'), g = cv.getContext('2d'), W = cv.width, H = cv.height; g.clearRect(0, 0, W, H);
@@ -2334,10 +2520,11 @@ function drawViews(s) {
       g.beginPath(); g.moveTo(0, H); pv.env.forEach((d, i) => g.lineTo(i / (n - 1) * W, Y(d))); g.lineTo(W, H); g.closePath();
       g.globalAlpha = 0.3; g.fillStyle = colorOf('rev'); g.fill(); g.globalAlpha = 1;
       g.strokeStyle = colorOf('rev'); g.lineWidth = 3; g.beginPath(); pv.env.forEach((d, i) => i ? g.lineTo(i / (n - 1) * W, Y(d)) : g.moveTo(0, Y(d))); g.stroke();
-      if (s.p.predelay > 0) { const x = s.p.predelay / pv.dur * W; g.strokeStyle = '#e7e9ee'; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.setLineDash([]); }
+      const preMs = TS.resolveTimes(s.p, state.bpm).predelay;
+      if (preMs > 0) { const x = preMs / pv.dur * W; g.strokeStyle = '#e7e9ee'; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.setLineDash([]); }
       g.fillStyle = '#9097a5'; font(g, 18); g.textAlign = 'right'; g.fillText(fmtT(pv.dur), W - 6, H - 10); g.fillText('−60 dB', W - 6, Y(mx - 60) - 6);
       let t60 = null; const pk = pv.env.indexOf(mx); for (let i = pk; i < n; i++) if (pv.env[i] < mx - 60) { t60 = i / (n - 1) * pv.dur; break; }
-      f.querySelector('.info').textContent = s.p.reverse ? `REVERSE ${fmtT(s.p.revLen)} · ピーク ${fmtT(pk / (n - 1) * pv.dur)}` : `−60 dB まで ${t60 === null ? '> ' + fmtT(pv.dur) : fmtT(t60)}`; }
+      f.querySelector('.info').textContent = s.p.reverse ? `REVERSE ${fmtT(TS.resolveTimes(s.p, state.bpm).revLen)} · ピーク ${fmtT(pk / (n - 1) * pv.dur)}` : `−60 dB まで ${t60 === null ? '> ' + fmtT(pv.dur) : fmtT(t60)}`; }
     f = fig('rt');
     if (f) { const cv = f.querySelector('canvas'), g = cv.getContext('2d'), W = cv.width, H = cv.height; g.clearRect(0, 0, W, H);
       const cap = f.querySelector('.cap');

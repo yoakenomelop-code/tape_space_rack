@@ -38,10 +38,36 @@ inline const char* typeKey (int t) { static const char* k[] = { "tape", "delay",
 inline int typeFromKey (const std::string& k) { for (int t = 0; t < kNumTypes; ++t) if (k == typeKey (t)) return t; return -1; }
 
 // ---------------------------------------------------------------- tables shared with the UI
-static const double SYNC_BEATS[14] = { 0.125, 1.0 / 6, 0.25, 0.375, 1.0 / 3, 0.5, 0.75, 2.0 / 3, 1, 1.5, 4.0 / 3, 2, 3, 4 };
-static const char* const SYNC_NAMES[14] = { "1/32", "1/16T", "1/16", "1/16.", "1/8T", "1/8", "1/8.", "1/4T", "1/4", "1/4.", "1/2T", "1/2", "1/2.", "1/1" };
+// note values for tempo sync (index 0 = free time). Same order as the picker grid and the web version:
+// 1/64 … 1/2 (triplet, straight, dotted), 1 bar (trip / straight / dotted), 2, 3, 4, 4/3, 5/4 bars, then every n/64 not listed above.
+struct Note { std::string name; double beats; };
+inline const std::vector<Note>& notes()
+{
+    static const std::vector<Note> n = [] {
+        std::vector<Note> v { { "None", 0 } };
+        for (int d : { 64, 32, 16, 8, 4, 2 })
+        {
+            const double b = 4.0 / d; const std::string base = "1/" + std::to_string (d);
+            v.push_back ({ base + " Trip", b * 2 / 3 }); v.push_back ({ base, b }); v.push_back ({ base + " Dot", b * 1.5 });
+        }
+        v.push_back ({ "1 Trip", 8.0 / 3 }); v.push_back ({ "1", 4 }); v.push_back ({ "1 Dot", 6 }); v.push_back ({ "2", 8 }); v.push_back ({ "3", 12 }); v.push_back ({ "4", 16 });
+        v.push_back ({ "4/3", 16.0 / 3 }); v.push_back ({ "5/4", 5 });
+        const int skip[] = { 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48 };
+        for (int k = 5; k < 64; ++k)
+        {
+            if (std::find (std::begin (skip), std::end (skip), k) != std::end (skip)) continue;
+            int g = 64, a = k; while (a) { const int t = g % a; g = a; a = t; }
+            v.push_back ({ std::to_string (k) + "/64" + (g > 1 ? " (" + std::to_string (k / g) + "/" + std::to_string (64 / g) + ")" : std::string()), k / 16.0 });
+        }
+        return v;
+    }();
+    return n;
+}
+inline int numNotes() { return (int) notes().size(); }           // 79
+inline double clampBpm (double bpm) { return clampv (bpm > 0 ? bpm : 120.0, 20.0, 300.0); }
+inline double noteMs (int idx, double bpm) { return idx > 0 ? notes()[(size_t) clampv (idx, 1, numNotes() - 1)].beats * 60000 / clampBpm (bpm) : -1; }
 static const double TAPE_SPEEDS[4] = { 3.75, 7.5, 15, 30 };
-static const double DELAY_MAX[4] = { 4000, 1600, 1200, 2000 };
+static const double DELAY_MAX[4] = { 8000, 1600, 1200, 2000 };
 static const double HEAD_RATIO[3] = { 1, 1.9, 2.8 };
 static const int HEADMASK[7] = { 1, 2, 4, 3, 6, 5, 7 };
 static constexpr double REV_MAX = 2000;
@@ -64,9 +90,20 @@ struct Params
     double source = 0, irIndex = 0, predelay = 20, size = 100, decay = 2.2, hiMult = 0.55, loMult = 1.2, diffusion = 80, er = 50, modulation = 30, width = 100;
     double reverse = 0, revLen = 1500, irLen = 100;
     double eqLo = 0, eqMid = 0, eqMidF = 1500, eqHi = 0;
+    double preSync = 0, decaySync = 0, revSync = 0;
     bool operator== (const Params& o) const { return std::memcmp (this, &o, sizeof (Params)) == 0; }
     bool operator!= (const Params& o) const { return ! (*this == o); }
 };
+// reverb times with tempo sync applied (pre-delay, decay, reverse length); the sync fields are cleared in the result
+inline Params resolveTimes (const Params& p, double bpm)
+{
+    Params q = p;
+    if (ival (p.preSync) > 0) q.predelay = clampv (noteMs (ival (p.preSync), bpm), 0.0, 2000.0);
+    if (ival (p.decaySync) > 0) q.decay = clampv (noteMs (ival (p.decaySync), bpm) / 1000, 0.1, 30.0);
+    if (ival (p.revSync) > 0) q.revLen = clampv (noteMs (ival (p.revSync), bpm), 100.0, 6000.0);
+    q.preSync = 0; q.decaySync = 0; q.revSync = 0;
+    return q;
+}
 inline Params defaultsFor (int type)
 {
     Params p;
@@ -620,7 +657,7 @@ private:
 inline double delayMs (const Params& p, double bpm)
 {
     const int mode = clampv (ival (p.variant), 0, 3); const double mx = DELAY_MAX[mode];
-    const double t = ival (p.sync) > 0 ? SYNC_BEATS[clampv (ival (p.sync) - 1, 0, 13)] * 60000 / clampv (bpm > 0 ? bpm : 120.0, 20.0, 300.0) : p.time;
+    const double t = ival (p.sync) > 0 ? noteMs (ival (p.sync), bpm) : p.time;
     return clampv (t, 1.0, p.reverse != 0 ? std::min (mx, REV_MAX) : mx);
 }
 inline double bbdCutoff (double ms) { return std::min (9000.0, 0.45 * 4096 / (2 * ms / 1000)); }
@@ -648,7 +685,7 @@ public:
     explicit Delay (double sampleRate) : fs (sampleRate)
     {
         p = defaultsFor (kDelay);
-        N = pow2 ((int) std::ceil (fs * 4.6) + 16); mask = N - 1;
+        N = pow2 ((int) std::ceil (fs * 8.6) + 16); mask = N - 1;
         buf[0].assign ((size_t) N, 0); buf[1].assign ((size_t) N, 0);
         for (auto& d : dc) d.init (fs);
         hiss[0].init (fs, 4321); hiss[1].init (fs, 8765);
@@ -863,7 +900,7 @@ public:
         for (auto& l : lines) l.assign ((size_t) maxLine, 0.0);
         lmask = maxLine - 1;
         for (int k = 0; k < FDN_N; ++k) { lphase[k] = k * 0.71; ldph[k] = 2 * PI * (0.13 + 0.061 * k) / fs; }
-        PN = pow2 ((int) std::ceil (0.5 * fs) + 8); pmask = PN - 1; pre[0].assign ((size_t) PN, 0); pre[1].assign ((size_t) PN, 0);
+        PN = pow2 ((int) std::ceil (2.05 * fs) + 8); pmask = PN - 1; pre[0].assign ((size_t) PN, 0); pre[1].assign ((size_t) PN, 0);
         erN = pow2 ((int) std::ceil (0.2 * fs * 1.7) + 8); erMask = erN - 1; erBuf.assign ((size_t) erN, 0);
         const int apMax = (int) nextPrime (12.73 * std::sqrt (1.65 * 2) * fs / 1000 * 1.07 + 8) + 8;
         for (auto& c : ap) for (auto& a : c) a.reserve (apMax);
@@ -873,6 +910,8 @@ public:
     ~Reverb() override = default;
     int type() const override { return kReverb; }
     void setParams (const Params& np) override { p = np; update(); }
+    void setBpm (double b) override { if (b != bpm) { bpm = b; update(); } }
+    double bpm = 120;
     bool usesIR() const { return ival (p.source) > 0 || p.reverse != 0; }
     // install a new convolver pair (audio thread). Returns the pair that is no longer needed (to be freed elsewhere).
     ConvPair* setIR (ConvPair* c)
@@ -887,8 +926,9 @@ public:
     ConvPair* releaseOld() { ConvPair* a = convOld; convOld = nullptr; return a; }
     void update()
     {
+        const Params p = resolveTimes (this->p, bpm);         // tempo-synced times (shadows the member on purpose)
         const auto& V = VARIANT[clampv (ival (p.variant), 0, 4)];
-        preD = clampv (p.predelay, 0.0, 490.0) * fs / 1000;
+        preD = clampv (p.predelay, 0.0, 2000.0) * fs / 1000;
         fdnLengths (p, fs, lens);
         for (int k = 0; k < FDN_N; ++k)
         {
@@ -1009,7 +1049,7 @@ inline std::unique_ptr<Module> create (int type, double fs)
 inline IR renderAlgoIR (const Params& p, double fs, double lenMs)
 {
     Reverb m (fs, true);
-    Params q = p; q.source = 0; q.reverse = 0; q.predelay = 0; q.mix = 100; q.width = 100; q.lowcut = 0; q.highcut = 0; q.output = 0; q.modulation = 0; q.eqLo = 0; q.eqMid = 0; q.eqHi = 0;
+    Params q = p; q.source = 0; q.reverse = 0; q.predelay = 0; q.mix = 100; q.width = 100; q.lowcut = 0; q.highcut = 0; q.output = 0; q.modulation = 0; q.eqLo = 0; q.eqMid = 0; q.eqHi = 0; q.preSync = 0; q.decaySync = 0; q.revSync = 0;
     m.setParams (q);
     const int n = (int) jsRound (lenMs * fs / 1000);
     IR out { std::vector<float> ((size_t) n, 0.f), std::vector<float> ((size_t) n, 0.f) };
@@ -1018,8 +1058,9 @@ inline IR renderAlgoIR (const Params& p, double fs, double lenMs)
     return out;
 }
 // the IR a reverb module needs: built-in / user / rendered algorithm, then trim + reverse. Empty when not needed.
-inline IR buildIR (const Params& p, double fs, const IR* userIR)
+inline IR buildIR (const Params& p0, double fs, const IR* userIR, double bpm)
 {
+    const Params p = resolveTimes (p0, bpm);
     const int src = ival (p.source);
     if (src == 0 && p.reverse == 0) return {};
     IR raw;
@@ -1047,9 +1088,9 @@ inline std::array<std::vector<double>, 2> echoPattern (const Params& p, double b
     }
     return out;
 }
-inline std::vector<double> reverbEnvelope (const Params& p, const IR* ir, double durMs, double binMs, double fs = 24000)
+inline std::vector<double> reverbEnvelope (const Params& p, const IR* ir, double durMs, double binMs, double fs, double bpm)
 {
-    Reverb m (fs, false); Params q = p; q.mix = 100; q.output = 0; m.setParams (q);
+    Reverb m (fs, false); m.bpm = bpm > 0 ? bpm : 120; Params q = p; q.mix = 100; q.output = 0; m.setParams (q);
     std::unique_ptr<ConvPair> cp;
     if (m.usesIR() && ir && ! ir->at (0).empty()) { cp = std::make_unique<ConvPair> ((*ir)[0], (*ir)[1]); m.setIR (cp.get()); }
     const int n = (int) jsRound (fs * durMs / 1000), step = (int) std::max (1L, jsRound (fs * binMs / 1000));

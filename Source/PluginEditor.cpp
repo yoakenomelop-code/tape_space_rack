@@ -16,6 +16,10 @@ juce::String fmtT (double ms)
     if (ms < 1000) return num (ms, ms < 10 ? 1 : 0) + " ms";
     return num (ms / 1000, ms < 10000 ? 1 : 0) + " s";
 }
+// precise time (trailing zeros dropped): 12.345 ms, 437.5 ms, 1.2345 s
+juce::String fmtP (double ms) { return ms < 1000 ? num (ms, ms < 100 ? 3 : 2) + " ms" : num (ms / 1000, 4) + " s"; }
+juce::String fmtMs (double ms) { return ms >= 1000 ? num (ms / 1000, 4) + J (" s（") + num (ms, 2) + J (" ms）") : num (ms, 3) + " ms"; }
+juce::String noteName (int i) { return i <= 0 ? juce::String ("FREE") : juce::String (ts::notes()[(size_t) juce::jlimit (1, ts::numNotes() - 1, i)].name); }
 juce::String hz (double f) { return f >= 1000 ? num (f / 1000, f >= 10000 ? 1 : 2) + " kHz" : juce::String ((int) std::lround (f)) + " Hz"; }
 juce::String sdb (double d) { return (d > 0 ? "+" : "") + juce::String (d, 1) + " dB"; }
 juce::String pct (double v) { return juce::String ((int) std::lround (v)) + " %"; }
@@ -175,6 +179,154 @@ void VKnob::paint (juce::Graphics& g)
     g.drawText (text ? text() : juce::String (slider.getValue(), 1), 0, 69, getWidth(), 14, juce::Justification::centred);
 }
 void VKnob::mouseEnter (const juce::MouseEvent&) { sink.hover (slot, band, describe ? describe() : caption); }
+void VKnob::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.eventComponent != this || e.y < 66 || ! isEnabled()) return;
+    if (onValueClick) { onValueClick(); return; }
+    if (! plainSet || ! plainGet) return;
+    entry = std::make_unique<juce::TextEditor>();
+    entry->setFont (mono (11.5f)); entry->setJustification (juce::Justification::centred);
+    entry->setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff111317));
+    entry->setColour (juce::TextEditor::outlineColourId, col::accent); entry->setColour (juce::TextEditor::focusedOutlineColourId, col::accent);
+    entry->setColour (juce::TextEditor::textColourId, col::ink);
+    entry->setText (juce::String (plainGet(), 4).trimCharactersAtEnd ("0").trimCharactersAtEnd ("."), false);
+    entry->setBounds (0, 67, getWidth(), 18);
+    entry->onReturnKey = [this] { finishEntry (true); };
+    entry->onEscapeKey = [this] { finishEntry (false); };
+    entry->onFocusLost = [this] { finishEntry (true); };
+    addAndMakeVisible (*entry); entry->selectAll(); entry->grabKeyboardFocus();
+}
+void VKnob::finishEntry (bool apply)
+{
+    if (! entry) return;
+    const auto t = entry->getText().trim().toLowerCase().replaceCharacter (',', '.');
+    if (apply && t.containsAnyOf ("0123456789"))
+    {
+        double v = t.getDoubleValue();
+        if (msUnit && t.endsWithChar ('s') && ! t.endsWith ("ms")) v *= 1000;          // "1.25 s" → 1250 ms
+        plainSet (juce::jlimit (plainLo, plainHi, v));
+    }
+    juce::MessageManager::callAsync ([sp = juce::Component::SafePointer<VKnob> (this)] { if (auto* k = sp.getComponent()) { k->entry.reset(); k->repaint(); } });
+}
+
+// ============================================================================ SyncPicker
+SyncPicker::SyncPicker()
+{
+    setWantsKeyboardFocus (true);
+    search.setTextToShowWhenEmpty (J ("Search（例：7/32, dot, trip）"), col::inkDim);
+    search.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff1b1c1e));
+    search.setColour (juce::TextEditor::outlineColourId, juce::Colour (0xff45484d));
+    search.setColour (juce::TextEditor::textColourId, col::ink);
+    search.setFont (mono (13.f));
+    search.onTextChange = [this] { filter(); };
+    search.onReturnKey = [this] { pick (cur); };
+    search.onEscapeKey = [this] { close(); };
+    addAndMakeVisible (search);
+    const std::pair<const char*, int> qj[] = { { "1/64", 1 }, { "1/8", 10 }, { "1 BAR", 19 }, { "n/64", 27 }, { "\xe2\x97\x8e", -1 } };
+    for (auto& q : qj)
+    {
+        auto* b = jumps.add (new juce::TextButton (juce::String::fromUTF8 (q.first)));
+        const int to = q.second;
+        b->onClick = [this, to] { mark (to < 0 && getter ? getter() : std::max (0, to)); search.grabKeyboardFocus(); };
+        addAndMakeVisible (b);
+    }
+    closeBtn.onClick = [this] { close(); };
+    addAndMakeVisible (closeBtn);
+    match.assign ((size_t) numNotes(), true);
+}
+void SyncPicker::open (const juce::String& t, std::function<int()> g, std::function<void (int)> s, std::function<double()> b)
+{
+    title = t; getter = std::move (g); setter = std::move (s); bpmFn = std::move (b);
+    search.setText ({}, false); match.assign ((size_t) numNotes(), true);
+    cur = getter ? getter() : 0;
+    setVisible (true); toFront (true);
+    search.grabKeyboardFocus();
+    repaint();
+}
+void SyncPicker::close() { setter = nullptr; setVisible (false); }
+void SyncPicker::resized()
+{
+    box = getLocalBounds().reduced (16).withSizeKeepingCentre (std::min (1180, getWidth() - 32), std::min (640, getHeight() - 32));
+    auto b = box;
+    head = b.removeFromTop (50); foot = b.removeFromBottom (36); grid = b.reduced (16, 10);
+    auto h = head.reduced (12, 10);
+    closeBtn.setBounds (h.removeFromRight (34)); h.removeFromRight (8);
+    search.setBounds (h.removeFromRight (260)); h.removeFromRight (8);
+    h.removeFromLeft (190 + 96);
+    for (auto* j : jumps) { j->setBounds (h.removeFromLeft (j->getButtonText().length() > 3 ? 58 : 48)); h.removeFromLeft (6); }
+}
+juce::Rectangle<int> SyncPicker::cell (int i) const
+{
+    const int col = i / kRows, row = i % kRows, cw = grid.getWidth() / 4, rh = grid.getHeight() / kRows;
+    return { grid.getX() + col * cw, grid.getY() + row * rh, cw - 14, rh };
+}
+int SyncPicker::hit (juce::Point<int> p) const { for (int i = 0; i < numNotes(); ++i) if (cell (i).contains (p)) return i; return -1; }
+void SyncPicker::mark (int i) { cur = juce::jlimit (0, numNotes() - 1, i); repaint(); }
+void SyncPicker::pick (int i)
+{
+    auto f = setter; close();
+    if (f && i >= 0) f (i);
+}
+void SyncPicker::filter()
+{
+    const auto q = search.getText().trim().toLowerCase();
+    int first = -1;
+    for (int i = 0; i < numNotes(); ++i)
+    {
+        const auto name = juce::String (notes()[(size_t) i].name).toLowerCase();
+        bool h = q.isEmpty() || juce::String (i + 1) == q || juce::String (i + 1).paddedLeft ('0', 2) == q;
+        for (int k = name.indexOf (q); ! h && k >= 0; k = name.indexOf (k + 1, q)) if (k == 0 || name[k - 1] == ' ' || name[k - 1] == '(') h = true;
+        match[(size_t) i] = h; if (h && first < 0) first = i;
+    }
+    if (first >= 0) cur = first;
+    repaint();
+}
+void SyncPicker::mouseMove (const juce::MouseEvent& e) { const int i = hit (e.getPosition()); if (i >= 0 && i != cur) mark (i); }
+void SyncPicker::mouseDown (const juce::MouseEvent& e)
+{
+    if (! box.contains (e.getPosition())) { close(); return; }
+    const int i = hit (e.getPosition()); if (i >= 0) pick (i);
+}
+bool SyncPicker::keyPressed (const juce::KeyPress& k)
+{
+    if (k == juce::KeyPress::escapeKey) { close(); return true; }
+    if (k == juce::KeyPress::returnKey) { pick (cur); return true; }
+    if (k == juce::KeyPress::downKey) { mark (cur + 1); return true; }
+    if (k == juce::KeyPress::upKey) { mark (cur - 1); return true; }
+    if (k == juce::KeyPress::rightKey) { mark (cur + kRows); return true; }
+    if (k == juce::KeyPress::leftKey) { mark (cur - kRows); return true; }
+    return false;
+}
+void SyncPicker::paint (juce::Graphics& g)
+{
+    g.fillAll (juce::Colour (0x8c08090b));
+    g.setColour (juce::Colour (0xff1b1c1e)); g.fillRoundedRectangle (box.toFloat(), 8.f);
+    g.setColour (juce::Colour (0xff262729)); g.fillRect (head); g.fillRect (foot);
+    g.setColour (juce::Colour (0xff3a3d42)); g.drawRoundedRectangle (box.toFloat(), 8.f, 1.f);
+    g.setColour (col::ink); g.setFont (font (15.f, true)); g.drawText (title, head.getX() + 14, head.getY(), 190, head.getHeight(), juce::Justification::centredLeft);
+    g.setColour (col::inkDim); g.setFont (font (12.f, true)); g.drawText ("QUICK JUMP", head.getX() + 14 + 190, head.getY(), 92, head.getHeight(), juce::Justification::centredLeft);
+    const int sel = getter ? getter() : -1;
+    for (int i = 0; i < numNotes(); ++i)
+    {
+        auto r = cell (i);
+        const bool isSel = i == sel, isCur = i == cur;
+        if (isSel) { g.setColour (juce::Colour (0xff13313a)); g.fillRect (r); g.setColour (juce::Colour (0xff43d3e6)); g.fillRect (r.withWidth (3)); }
+        else if (isCur) { g.setColour (juce::Colour (0xff24282e)); g.fillRect (r); }
+        if (isCur && isSel) { g.setColour (juce::Colour (0xff6fe3f0).withAlpha (0.25f)); g.drawRect (r); }
+        const float a = match[(size_t) i] ? 1.f : 0.18f;
+        g.setFont (mono (13.f));
+        g.setColour (juce::Colour (0xff7d8492).withAlpha (a)); g.drawText (juce::String (i + 1).paddedLeft ('0', 2), r.getX() + 10, r.getY(), 28, r.getHeight(), juce::Justification::centredLeft);
+        g.setColour ((isSel ? juce::Colour (0xff6fe3f0) : col::ink).withAlpha (a));
+        g.drawText (juce::String (notes()[(size_t) i].name), r.getX() + 40, r.getY(), r.getWidth() - 44, r.getHeight(), juce::Justification::centredLeft);
+    }
+    const double ms = noteMs (cur, bpmFn ? bpmFn() : 120);
+    g.setFont (mono (13.f));
+    g.setColour (juce::Colour (0xff7d8492)); g.drawText (juce::String (cur + 1).paddedLeft ('0', 2), foot.getX() + 16, foot.getY(), 30, foot.getHeight(), juce::Justification::centredLeft);
+    g.setColour (col::ink); g.drawText (cur == 0 ? J ("None（FREE）") : juce::String (notes()[(size_t) cur].name), foot.getX() + 50, foot.getY(), 300, foot.getHeight(), juce::Justification::centredLeft);
+    g.setColour (col::inkDim);
+    g.drawText (ms < 0 ? J ("テンポ同期なし（ミリ秒で設定）") : (ms >= 1000 ? num (ms / 1000, 4) + " s (" + num (ms, 2) + " ms)" : num (ms, 3) + " ms") + " @ " + num (bpmFn ? bpmFn() : 120, 2) + " BPM",
+                foot.withTrimmedRight (16), juce::Justification::centredRight);
+}
 void VKnob::mouseExit (const juce::MouseEvent&) { if (! slider.isMouseButtonDown()) sink.hover (-1, hlNone, {}); }
 
 // ============================================================================ Seg
@@ -244,7 +396,7 @@ void View::refresh (float liveIn)
     const Params p = proc.reader.params (slot);
     const double bpm = proc.hostBpm.load();
     const int serial = proc.irSerial (slot);
-    if (! valid || p != last || (kind == echo && bpm != lastBpm) || ((kind == revEnv || kind == revRT) && serial != lastSerial)) dirty = true;
+    if (! valid || p != last || (kind != tapeTransfer && kind != tapeResp && bpm != lastBpm) || ((kind == revEnv || kind == revRT) && serial != lastSerial)) dirty = true;
     const auto now = juce::Time::getMillisecondCounter();
     if (dirty && now - lastCalc > 120)
     {
@@ -272,10 +424,11 @@ void View::refresh (float liveIn)
             }
             case revEnv:
             {
+                const Params p = resolveTimes (last, bpm);
                 if (! usesIR)
                 {
                     dur = std::min (12000.0, std::max (1200.0, p.decay * 1300 + p.predelay));
-                    a = reverbEnvelope (p, nullptr, dur, dur / 330, 24000);
+                    a = reverbEnvelope (p, nullptr, dur, dur / 330, 24000, bpm);
                 }
                 else
                 {
@@ -299,7 +452,7 @@ void View::refresh (float liveIn)
             }
             case revRT:
             {
-                if (ival (p.source) == 0) a = rtCurve (p, 48000, respFreqs());
+                if (ival (p.source) == 0) a = rtCurve (resolveTimes (p, bpm), 48000, respFreqs());
                 else
                 {
                     const IR ir = proc.currentIR (slot);
@@ -360,7 +513,7 @@ void View::paint (juce::Graphics& g)
         case echo:
         {
             juce::String info = fmtT (ms);
-            if (ival (P.sync) > 0) info << " (" << SYNC_NAMES[clampv (ival (P.sync) - 1, 0, 13)] << ")";
+            if (ival (P.sync) > 0) info << " (" << noteName (ival (P.sync)) << ")";
             static const char* st[] = { "MONO", "STEREO", "PING-PONG", "DUAL" };
             info << " · " << st[clampv (ival (P.stereo), 0, 3)]; if (P.reverse != 0) info << " · REVERSE";
             frame (g, bounds, lit, col::time, J ("エコーの並び L ↑ / R ↓"), info);
@@ -389,7 +542,7 @@ void View::paint (juce::Graphics& g)
             double mx = -200; int pk = 0; for (int i = 0; i < n; ++i) if (a[(size_t) i] > mx) { mx = a[(size_t) i]; pk = i; }
             if (n > 1)
             {
-                if (P.reverse != 0) info = "REVERSE " + fmtT (P.revLen) + J (" · ピーク ") + fmtT ((double) pk / (n - 1) * dur);
+                if (P.reverse != 0) info = "REVERSE " + fmtT (resolveTimes (P, lastBpm).revLen) + J (" · ピーク ") + fmtT ((double) pk / (n - 1) * dur);
                 else { double t60 = -1; for (int i = pk; i < n; ++i) if (a[(size_t) i] < mx - 60) { t60 = (double) i / (n - 1) * dur; break; } info = J ("−60 dB まで ") + (t60 < 0 ? "> " + fmtT (dur) : fmtT (t60)); }
             }
             else if (usesIR) info = J ("IR 準備中…");
@@ -403,7 +556,8 @@ void View::paint (juce::Graphics& g)
             g.setColour (col::rev.withAlpha (0.3f)); g.fillPath (p);
             juce::Path l; for (int i = 0; i < n; ++i) { const float x = r.getX() + (float) i / (n - 1) * r.getWidth(); i ? l.lineTo (x, Y (a[(size_t) i])) : l.startNewSubPath (x, Y (a[(size_t) i])); }
             g.setColour (col::rev); g.strokePath (l, juce::PathStrokeType (2.f));
-            if (P.predelay > 0 && dur > 0) { const float x = r.getX() + (float) (P.predelay / dur) * r.getWidth(); const float dl[] = { 3, 3 }; g.setColour (col::ink); g.drawDashedLine ({ x, r.getY(), x, r.getBottom() }, dl, 2, 1.f); }
+            const double preMs = resolveTimes (P, lastBpm).predelay;
+            if (preMs > 0 && dur > 0) { const float x = r.getX() + (float) (preMs / dur) * r.getWidth(); const float dl[] = { 3, 3 }; g.setColour (col::ink); g.drawDashedLine ({ x, r.getY(), x, r.getBottom() }, dl, 2, 1.f); }
             g.setColour (col::inkDim); g.setFont (mono (9.5f)); g.drawText (fmtT (dur), r.toNearestInt(), juce::Justification::bottomRight);
             break;
         }
@@ -611,7 +765,7 @@ juce::String ModulePanel::structureKey() const
     juce::String k;
     if (type == kTape) k << (ival (p.variant) == 2 ? "c" : "r");
     if (type == kDelay) k << ival (p.variant) << "/" << ival (p.stereo) << "/" << (ival (p.sync) > 0 ? 1 : 0) << "/" << (int) p.reverse;
-    if (type == kReverb) k << ival (p.source) << "/" << (int) p.reverse;
+    if (type == kReverb) k << ival (p.source) << "/" << (int) p.reverse << "/" << (ival (p.preSync) > 0 ? 1 : 0) << (ival (p.decaySync) > 0 ? 1 : 0) << (ival (p.revSync) > 0 ? 1 : 0);
     return k;
 }
 void ModulePanel::group (const juce::String& name, int hl) { groups.push_back ({ name, hl, {}, {}, {} }); }
@@ -626,6 +780,7 @@ VKnob* ModulePanel::lin (const char* key, const juce::String& label, double lo, 
     k->get = [this, key] { return get (key); }; k->set = [this, key] (double v) { set (key, v); };
     k->text = [this, key, fmt] { return fmt (get (key)); }; k->describe = desc;
     k->def = defaultsFor (type).*(specOf (key)->field);
+    k->plainGet = [this, key] { return get (key); }; k->plainSet = [this, key] (double v) { set (key, v); }; k->plainLo = lo; k->plainHi = hi;
     return k;
 }
 VKnob* ModulePanel::logKnob (const char* key, const juce::String& label, double lo, double hi, std::function<juce::String (double)> fmt, int hl, std::function<juce::String()> desc)
@@ -635,6 +790,29 @@ VKnob* ModulePanel::logKnob (const char* key, const juce::String& label, double 
     k->set = [this, key] (double v) { set (key, std::exp (v)); };
     k->text = [this, key, fmt] { return fmt (get (key)); }; k->describe = desc;
     k->def = std::log (juce::jlimit (lo, hi, defaultsFor (type).*(specOf (key)->field)));
+    k->plainGet = [this, key] { return get (key); }; k->plainSet = [this, key] (double v) { set (key, v); }; k->plainLo = lo; k->plainHi = hi;
+    const juce::String ks (key); k->msUnit = ks == "time" || ks == "predelay" || ks == "revLen";
+    return k;
+}
+VKnob* ModulePanel::syncKnob (const char* key, const juce::String& label, int hl, const juce::String& title, const juce::String& what)
+{
+    juce::StringArray names; for (int i = 0; i < numNotes(); ++i) names.add (noteName (i));
+    auto* k = listKnob (label, hl, names, [this, key] { return (int) get (key); }, [this, key] (int i) { set (key, i); }, 0,
+        [this, key, what]
+        {
+            const int i = (int) get (key);
+            return i > 0 ? what + J ("：") + noteName (i) + " = " + fmtMs (noteMs (i, proc.hostBpm.load())) + J ("（") + num (proc.hostBpm.load(), 2) + J (" BPM）。値をクリックすると 79 種の一覧から選べます")
+                         : what + J ("：FREE（ミリ秒で設定）。値をクリックすると 79 種の音符の一覧から選べます（3 連符・付点・n/64 など）");
+        });
+    k->text = [this, key] { const int i = (int) get (key); return i > 0 ? noteName (i).upToFirstOccurrenceOf (" (", false, false) : juce::String ("FREE"); };
+    k->onValueClick = [this, key, title, hl]
+    {
+        editor.openPicker (title, [this, key] { return (int) get (key); }, [this, key, title, hl] (int i)
+        {
+            set (key, i);
+            sink.hover (slot, hl, title + J ("：") + (i > 0 ? noteName (i) + " = " + fmtMs (noteMs (i, proc.hostBpm.load())) : J ("None（FREE）")));
+        });
+    };
     return k;
 }
 VKnob* ModulePanel::listKnob (const juce::String& label, int hl, const juce::StringArray& names, std::function<int()> getI, std::function<void (int)> setI, int def, std::function<juce::String()> desc)
@@ -732,16 +910,15 @@ void ModulePanel::build()
         const bool synced = ival (p.sync) > 0;
         const double mx = p.reverse != 0 ? std::min (DELAY_MAX[mode], REV_MAX) : DELAY_MAX[mode];
         group ("TIME", hlTime);
-        auto* kt = logKnob ("time", "Time", 1, mx, fmtT, hlTime, [this, mx]
+        auto* kt = logKnob ("time", "Time", 1, mx, fmtP, hlTime, [this, mx]
         {
             const auto q = P(); const double ms = delayMs (q, proc.hostBpm.load());
-            return ival (q.sync) > 0 ? J ("TIME：テンポ同期中（") + SYNC_NAMES[clampv (ival (q.sync) - 1, 0, 13)] + " = " + fmtT (ms) + " @ " + num (proc.hostBpm.load(), 1) + " BPM）" : J ("TIME：") + fmtT (q.time) + J ("（最大 ") + fmtT (mx) + J ("）");
+            return ival (q.sync) > 0 ? J ("TIME：テンポ同期中（") + noteName (ival (q.sync)) + " = " + fmtMs (ms) + " @ " + num (proc.hostBpm.load(), 2) + " BPM）" + (noteMs (ival (q.sync), proc.hostBpm.load()) > mx ? J ("。最大 ") + fmtT (mx) + J (" で頭打ち") : juce::String())
+                                     : J ("TIME：") + fmtMs (q.time) + J ("（最大 ") + fmtT (mx) + J ("）。値をクリックすると 0.001 ms 単位で数値入力できます");
         });
-        kt->text = [this] { return fmtT (delayMs (P(), proc.hostBpm.load())); };
+        kt->text = [this] { return fmtP (delayMs (P(), proc.hostBpm.load())); };
         kt->setEnabled (! synced);
-        juce::StringArray syncNames { "FREE" }; for (auto* n : SYNC_NAMES) syncNames.add (n);
-        listKnob ("Sync", hlTime, syncNames, [this] { return (int) get ("sync"); }, [this] (int i) { set ("sync", i); }, 0,
-                  [this] { const int sy = (int) get ("sync"); return sy > 0 ? J ("SYNC：") + SYNC_NAMES[clampv (sy - 1, 0, 13)] + J ("（T＝3 連符、. ＝付点）= ") + fmtT (delayMs (P(), proc.hostBpm.load())) + J ("。テンポはホストに追従") : J ("SYNC：FREE（ミリ秒で自由に設定）"); });
+        syncKnob ("sync", "Sync", hlTime, "DELAY TIME SYNC", "SYNC");
         if (ival (p.stereo) == 3) lin ("ratioLR", "R / L", 10, 200, 1, pct, hlTime, [this] { return J ("R / L：右チャンネルの時間を左の ") + pct (get ("ratioLR")) + J (" に"); });
         if (mode == 1) seg ("Heads", { "1", "2", "3", "1+2", "2+3", "1+3", "1+2+3" }, hlTime, [this] { return (int) get ("heads"); }, [this] (int i) { set ("heads", i); },
                             [] (int) { return J ("PLAYBACK HEADS：再生ヘッドの組み合わせ（ヘッド 2・3 はヘッド 1 の 1.9 倍・2.8 倍の距離）。複数ヘッドでリズミカルな反復"); });
@@ -795,11 +972,21 @@ void ModulePanel::build()
         addItem (ib, 170);
         if (! algo) lin ("irLen", "Length", 5, 100, 1, pct, hlRev, [this] { return J ("IR LENGTH：IR の長さを ") + pct (get ("irLen")) + J (" に切り詰める（末尾はフェード）"); });
         group ("SPACE", hlRev);
-        lin ("predelay", "Pre-delay", 0, 250, 1, [] (double v) { return juce::String ((int) std::lround (v)) + " ms"; }, hlRev, [this] { return J ("PRE-DELAY：直接音から残響が始まるまで ") + juce::String ((int) get ("predelay")) + J (" ms"); });
+        auto RT = [this] { return resolveTimes (P(), proc.hostBpm.load()); };
+        auto* kp = logKnob ("predelay", "Pre-delay", 0.1, 1000, fmtP, hlRev, [this, RT]
+            { return ival (P().preSync) > 0 ? J ("PRE-DELAY：テンポ同期中（") + noteName (ival (P().preSync)) + " = " + fmtMs (RT().predelay) + J ("）") : J ("PRE-DELAY：直接音から残響が始まるまで ") + fmtMs (get ("predelay")) + J ("。値をクリックで数値入力"); });
+        kp->text = [RT] { const double v = RT().predelay; return v < 0.15 ? juce::String ("0 ms") : fmtP (v); };
+        kp->plainLo = 0;
+        kp->setEnabled (ival (p.preSync) == 0);
+        syncKnob ("preSync", "Sync", hlRev, "PRE-DELAY SYNC", "PRE-DELAY SYNC");
         if (algo)
         {
             lin ("size", "Size", 20, 200, 1, pct, hlRev, [this] { return J ("SIZE：空間の大きさ ") + pct (get ("size")) + J ("（ディレイラインと初期反射の長さ）"); });
-            logKnob ("decay", "Decay", 0.1, 30, [] (double v) { return num (v, v < 10 ? 2 : 1) + " s"; }, hlRev, [this] { return J ("DECAY：中域の残響時間（RT60）") + juce::String (get ("decay"), 2) + J (" 秒"); });
+            auto* kd = logKnob ("decay", "Decay", 0.1, 30, [] (double v) { return num (v, 3) + " s"; }, hlRev, [this, RT]
+                { return ival (P().decaySync) > 0 ? J ("DECAY：テンポ同期中（RT60 = ") + noteName (ival (P().decaySync)) + " = " + num (RT().decay, 3) + J (" 秒）") : J ("DECAY：中域の残響時間（RT60）") + num (get ("decay"), 3) + J (" 秒。値をクリックで数値入力"); });
+            kd->text = [RT] { return num (RT().decay, 3) + " s"; };
+            kd->setEnabled (ival (p.decaySync) == 0);
+            syncKnob ("decaySync", "Sync", hlRev, "DECAY SYNC (RT60)", "DECAY SYNC");
             logKnob ("loMult", "Low x", 0.25, 4, [] (double v) { return "x" + juce::String (v, 2); }, hlRev, [this] { return J ("LOW ×：250 Hz 以下の残響時間を中域の ") + juce::String (get ("loMult"), 2) + J (" 倍に"); });
             logKnob ("hiMult", "High x", 0.05, 2, [] (double v) { return "x" + juce::String (v, 2); }, hlRev, [this] { return J ("HIGH ×：3.5 kHz 以上の残響時間を中域の ") + juce::String (get ("hiMult"), 2) + J (" 倍に（小さいほど暗い）"); });
             group ("CHARACTER", hlRev);
@@ -809,7 +996,14 @@ void ModulePanel::build()
         }
         group ("REVERSE", hlRev);
         tog ("REVERSE", hlRev, onOff ("reverse"), setB ("reverse"), [this, algo] { return get ("reverse") > 0.5 ? J ("REVERSE オン：残響を時間反転した“吸い込む”リバーブ。音の後ろで膨らみ、ぷつっと切れる") + (algo ? J ("（ALGO はアルゴリズムの応答を反転して畳み込み）") : juce::String()) : J ("REVERSE：オンでリバース・リバーブ"); });
-        if (p.reverse != 0) lin ("revLen", "Length", 100, 6000, 10, fmtT, hlRev, [this] { return J ("REVERSE LENGTH：吸い込みの長さ ") + fmtT (get ("revLen")) + J ("（1 拍 = ") + fmtT (60000 / proc.hostBpm.load()) + J ("）"); });
+        if (p.reverse != 0)
+        {
+            auto* kr = logKnob ("revLen", "Length", 100, 6000, fmtP, hlRev, [this, RT]
+                { return ival (P().revSync) > 0 ? J ("REVERSE LENGTH：テンポ同期中（") + noteName (ival (P().revSync)) + " = " + fmtMs (RT().revLen) + J ("）") : J ("REVERSE LENGTH：吸い込みの長さ ") + fmtMs (get ("revLen")) + J ("。値をクリックで数値入力（1 拍 = ") + fmtMs (60000 / proc.hostBpm.load()) + J ("）"); });
+            kr->text = [RT] { return fmtP (RT().revLen); };
+            kr->setEnabled (ival (p.revSync) == 0);
+            syncKnob ("revSync", "Sync", hlRev, "REVERSE LENGTH SYNC", "REVERSE SYNC");
+        }
         group ("WET CUT", hlEq);
         logKnob ("lowcut", "Low Cut", 19.9, 1000, cutLo, hlEq, [this] { return J ("LOW CUT：残響の低域を削る（") + cutLo (get ("lowcut")) + J ("）。左端で OFF"); });
         logKnob ("highcut", "High Cut", 1000, 20000, cutHi, hlEq, [this] { return J ("HIGH CUT：残響の高域を削る（") + cutHi (get ("highcut")) + J ("）。右端で OFF"); });
@@ -1188,6 +1382,7 @@ TapeSpaceRackEditor::TapeSpaceRackEditor (TapeSpaceRackProcessor& p) : AudioProc
     addAndMakeVisible (viewport);
     rebuildPanels();
     hover (-1, hlNone, {});
+    addChildComponent (picker);
     setResizable (true, true); setResizeLimits (kW, 640, kW, 1800); setSize (kW, 960);
     startTimerHz (30);
 }
@@ -1298,6 +1493,7 @@ void TapeSpaceRackEditor::resized()
     }
     r.removeFromTop (kGap);
     viewport.setBounds (r);
+    picker.setBounds (getLocalBounds());
     layoutRack();
 }
 void TapeSpaceRackEditor::dragPanel (ts::ui::ModulePanel& pn, int yInRack, bool finished)

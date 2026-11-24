@@ -16,14 +16,34 @@ var TS = (function () {
   const TYPES = ['tape', 'delay', 'reverb'];
 
   // ---------------------------------------------------------------- positions / names
-  const SYNC = {
-    names: ['1/32', '1/16T', '1/16', '1/16.', '1/8T', '1/8', '1/8.', '1/4T', '1/4', '1/4.', '1/2T', '1/2', '1/2.', '1/1'],
-    beats: [0.125, 1 / 6, 0.25, 0.375, 1 / 3, 0.5, 0.75, 2 / 3, 1, 1.5, 4 / 3, 2, 3, 4],
-  };
+  // note values for tempo sync (index 0 = free time). Same order as the picker grid:
+  // 1/64 … 1/2 (triplet, straight, dotted), 1 bar (trip / straight / dotted), 2, 3, 4, 4/3, 5/4 bars, then every n/64 not listed above.
+  const NOTES = (() => {
+    const n = [{ name: 'None', beats: 0 }];
+    for (const d of [64, 32, 16, 8, 4, 2]) { const b = 4 / d; n.push({ name: `1/${d} Trip`, beats: b * 2 / 3 }, { name: `1/${d}`, beats: b }, { name: `1/${d} Dot`, beats: b * 1.5 }); }
+    n.push({ name: '1 Trip', beats: 8 / 3 }, { name: '1', beats: 4 }, { name: '1 Dot', beats: 6 }, { name: '2', beats: 8 }, { name: '3', beats: 12 }, { name: '4', beats: 16 },
+           { name: '4/3', beats: 16 / 3 }, { name: '5/4', beats: 5 });
+    const skip = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48], gcd = (a, b) => (b ? gcd(b, a % b) : a);
+    for (let k = 5; k < 64; k++) if (skip.indexOf(k) < 0) { const g = gcd(k, 64); n.push({ name: g > 1 ? `${k}/64 (${k / g}/${64 / g})` : `${k}/64`, beats: k / 16 }); }
+    return n;
+  })();
+  const SYNC = { names: NOTES.map((x) => x.name), beats: NOTES.map((x) => x.beats), count: NOTES.length };
+  const clampBpm = (bpm) => clamp(bpm || 120, 20, 300);
+  // length of note value idx in ms (null when idx is 0 = free)
+  const noteMs = (idx, bpm) => ((idx | 0) > 0 ? NOTES[clamp(idx | 0, 1, NOTES.length - 1)].beats * 60000 / clampBpm(bpm) : null);
+  // reverb times with tempo sync applied (pre-delay, decay, reverse length); the sync fields are cleared in the result
+  function resolveTimes(p, bpm) {
+    const q = Object.assign({}, p);
+    if ((p.preSync | 0) > 0) q.predelay = clamp(noteMs(p.preSync, bpm), 0, 2000);
+    if ((p.decaySync | 0) > 0) q.decay = clamp(noteMs(p.decaySync, bpm) / 1000, 0.1, 30);
+    if ((p.revSync | 0) > 0) q.revLen = clamp(noteMs(p.revSync, bpm), 100, 6000);
+    q.preSync = 0; q.decaySync = 0; q.revSync = 0;
+    return q;
+  }
   const SPEC = {
     tape: { variants: ['Studio 2-Track', 'Multitrack', 'Cassette'], speed: [3.75, 7.5, 15, 30], formula: ['Modern', 'Classic', 'Vintage'], eq: ['NAB', 'CCIR'] },
     delay: { variants: ['Digital HQ', 'Tape Echo', 'Analog BBD', 'Vintage Digital'], stereo: ['MONO', 'STEREO', 'PING-PONG', 'DUAL'],
-             heads: ['1', '2', '3', '1+2', '2+3', '1+3', '1+2+3'], headRatio: [1, 1.9, 2.8], maxTime: [4000, 1600, 1200, 2000] },
+             heads: ['1', '2', '3', '1+2', '2+3', '1+3', '1+2+3'], headRatio: [1, 1.9, 2.8], maxTime: [8000, 1600, 1200, 2000] },
     reverb: { variants: ['Hall', 'Room', 'Plate', 'Chamber', 'Cathedral'], source: ['ALGO', 'IR', 'USER IR'],
               irs: ['Concert Hall', 'Wood Room', 'Bright Plate', 'Stone Chamber', 'Vocal Booth', 'Large Church', 'Spring Tank'] },
   };
@@ -54,7 +74,7 @@ var TS = (function () {
     drive: 0, speed: 15, eqStd: 0, formula: 0, bias: 0, wow: 0, flutter: 0, hiss: 0,
     time: 375, sync: 0, feedback: 35, stereo: 1, ratioLR: 75, lowcut: 80, highcut: 12000, modRate: 0.5, modDepth: 0, duck: 0, heads: 0,
     source: 0, irIndex: 0, predelay: 20, size: 100, decay: 2.2, hiMult: 0.55, loMult: 1.2, diffusion: 80, er: 50, modulation: 30, width: 100,
-    reverse: 0, revLen: 1500, irLen: 100,
+    reverse: 0, revLen: 1500, irLen: 100, preSync: 0, decaySync: 0, revSync: 0,
     eqLo: 0, eqMid: 0, eqMidF: 1500, eqHi: 0,
   };
   const DEFAULTS = {
@@ -395,7 +415,7 @@ var TS = (function () {
   }
   // render the algorithmic reverb's impulse response (used for reverse reverb in ALGO mode)
   function renderAlgoIR(p, fs, lenMs) {
-    const m = new Reverb(fs, true); m.setParams(Object.assign({}, p, { source: 0, reverse: 0, predelay: 0, mix: 100, width: 100, lowcut: 0, highcut: 0, output: 0, modulation: 0, eqLo: 0, eqMid: 0, eqHi: 0 }));
+    const m = new Reverb(fs, true); m.setParams(Object.assign({}, p, { source: 0, reverse: 0, predelay: 0, mix: 100, width: 100, lowcut: 0, highcut: 0, output: 0, modulation: 0, eqLo: 0, eqMid: 0, eqHi: 0, preSync: 0, decaySync: 0, revSync: 0 }));
     const n = Math.round(lenMs * fs / 1000), L = new Float32Array(n), R = new Float32Array(n);
     L[0] = R[0] = 1;
     for (let i = 0; i < n; i += 512) { const k = Math.min(512, n - i); m.process(L.subarray(i, i + k), R.subarray(i, i + k), k); }
@@ -510,7 +530,7 @@ var TS = (function () {
   // ================================================================ DELAY
   function delayMs(p, bpm) {
     const mode = clamp(p.variant | 0, 0, 3), max = SPEC.delay.maxTime[mode];
-    const t = (p.sync | 0) > 0 ? SYNC.beats[clamp((p.sync | 0) - 1, 0, SYNC.beats.length - 1)] * 60000 / clamp(bpm || 120, 20, 300) : num(p.time, 375);
+    const t = (p.sync | 0) > 0 ? noteMs(p.sync, bpm) : num(p.time, 375);
     return clamp(t, 1, p.reverse ? Math.min(max, REV_MAX) : max);
   }
   function bbdCutoff(ms) { return Math.min(9000, 0.45 * 4096 / (2 * ms / 1000)); }
@@ -536,7 +556,7 @@ var TS = (function () {
   class Delay {
     constructor(fs) {
       this.fs = fs; this.type = 'delay'; this.p = Object.assign({}, DEFAULTS.delay); this.bpm = 120;
-      this.N = pow2(Math.ceil(fs * 4.6) + 16); this.mask = this.N - 1;
+      this.N = pow2(Math.ceil(fs * 8.6) + 16); this.mask = this.N - 1;
       this.buf = [new Float64Array(this.N), new Float64Array(this.N)]; this.w = 0;
       this.loop = [[], []]; this.dc = [new DCBlock(fs), new DCBlock(fs)];
       this.weq = [[], []]; this.rloop = [[], []]; this.rn = 0;
@@ -720,14 +740,14 @@ var TS = (function () {
   }
   class Reverb {
     constructor(fs, offline) {
-      this.fs = fs; this.type = 'reverb'; this.p = Object.assign({}, DEFAULTS.reverb); this.offline = !!offline;
+      this.fs = fs; this.type = 'reverb'; this.p = Object.assign({}, DEFAULTS.reverb); this.offline = !!offline; this.bpm = 120;
       const maxLine = pow2(Math.ceil(123.7 * 1.65 * 2 * fs / 1000) + 64);
       this.lines = []; for (let k = 0; k < FDN_N; k++) this.lines.push(new Float64Array(maxLine));
       this.lmask = maxLine - 1; this.lw = 0;
       this.lp = []; this.hp = []; for (let k = 0; k < FDN_N; k++) { this.lp.push(new Biquad()); this.hp.push(new Biquad()); }
       this.v = new Float64Array(FDN_N); this.lphase = new Float64Array(FDN_N); this.ldph = new Float64Array(FDN_N);
       for (let k = 0; k < FDN_N; k++) { this.lphase[k] = k * 0.71; this.ldph[k] = 2 * PI * (0.13 + 0.061 * k) / fs; }
-      this.PN = pow2(Math.ceil(0.5 * fs) + 8); this.pmask = this.PN - 1; this.pre = [new Float64Array(this.PN), new Float64Array(this.PN)]; this.pw = 0;
+      this.PN = pow2(Math.ceil(2.05 * fs) + 8); this.pmask = this.PN - 1; this.pre = [new Float64Array(this.PN), new Float64Array(this.PN)]; this.pw = 0;
       this.ap = [[], []]; this.erN = pow2(Math.ceil(0.2 * fs * 1.7) + 8); this.erMask = this.erN - 1; this.erBuf = new Float64Array(this.erN); this.erW = 0;
       this.erLP = [new Biquad(), new Biquad()];
       this.eq = [[], []]; this.dc = [new DCBlock(fs), new DCBlock(fs)];
@@ -737,9 +757,10 @@ var TS = (function () {
     }
     setParams(o) { Object.assign(this.p, o); this.update(); }
     usesIR() { const p = this.p; return (p.source | 0) > 0 || !!p.reverse; }
+    setBpm(b) { if (b !== this.bpm) { this.bpm = b; this.update(); } }
     // key of everything the IR depends on (the host builds the IR off the audio thread and calls setIR)
     irKey() {
-      const p = this.p;
+      const p = resolveTimes(this.p, this.bpm);
       if (!this.usesIR()) return '';
       const base = (p.source | 0) === 0 ? ['algo', p.variant, p.size, p.decay, p.hiMult, p.loMult, p.diffusion, p.er] : (p.source | 0) === 1 ? ['ir', p.irIndex] : ['user'];
       return base.concat([p.irLen, p.reverse, p.reverse ? p.revLen : 0]).join('/');
@@ -750,8 +771,8 @@ var TS = (function () {
       this.conv = c;
     }
     update() {
-      const p = this.p, fs = this.fs, V = VARIANT[clamp(p.variant | 0, 0, 4)];
-      this.preD = clamp(num(p.predelay, 20), 0, 490) * fs / 1000;
+      const p = resolveTimes(this.p, this.bpm), fs = this.fs, V = VARIANT[clamp(p.variant | 0, 0, 4)];
+      this.preD = clamp(num(p.predelay, 20), 0, 2000) * fs / 1000;
       this.lens = fdnLengths(p, fs);
       for (let k = 0; k < FDN_N; k++) {
         const G = lineGains(this.lens[k], p, fs);
@@ -893,9 +914,9 @@ var TS = (function () {
     return [outL, outR];
   }
   // reverb: energy envelope (dB) per bin of the wet response to a click
-  function reverbEnvelope(p, irLR, durMs, binMs, fs) {
+  function reverbEnvelope(p, irLR, durMs, binMs, fs, bpm) {
     fs = fs || 24000;
-    const m = new Reverb(fs, false); m.setParams(Object.assign({}, p, { mix: 100, output: 0 }));
+    const m = new Reverb(fs, false); m.bpm = bpm || 120; m.setParams(Object.assign({}, p, { mix: 100, output: 0 }));
     if (m.usesIR() && irLR) m.setIR(irLR[0], irLR[1]);
     const n = Math.round(fs * durMs / 1000), step = Math.max(1, Math.round(fs * binMs / 1000));
     const L = new Float32Array(step), R = new Float32Array(step), env = [];
@@ -948,8 +969,8 @@ var TS = (function () {
     return freqs.map((f) => secsMagDb(s, fs, f));
   }
   // the IR a reverb module needs (or null): built-in / user (passed in) / rendered algorithm, then trim + reverse
-  function buildIR(p, fs, userIR) {
-    const src = (p.source | 0);
+  function buildIR(p0, fs, userIR, bpm) {
+    const p = resolveTimes(p0, bpm), src = (p.source | 0);
     if (src === 0 && !p.reverse) return null;
     let raw;
     if (src === 1) raw = synthIR(p.irIndex | 0, fs);
@@ -959,7 +980,7 @@ var TS = (function () {
     return prepareIR(raw, p, fs);
   }
 
-  return { TYPES, SPEC, SYNC, CIRCUIT, DEFAULTS, REF, Rack, create, Convolver, synthIR, prepareIR, buildIR, renderAlgoIR, normalizeIR,
+  return { TYPES, SPEC, SYNC, NOTES, noteMs, resolveTimes, CIRCUIT, DEFAULTS, REF, Rack, create, Convolver, synthIR, prepareIR, buildIR, renderAlgoIR, normalizeIR,
            echoPattern, reverbEnvelope, design3Band, designDelayLoop, designWetEQ, tapeCurve, tapeLevelResponse, harmonics, responseTone, rtCurve, delayMs, fdnLengths,
            halfbandCoefs, Halfband, fft, rfft, irfft, dbToLin, linToDb, bqMagDb, secsMagDb, designTapeTone, IRSPEC };
 })();

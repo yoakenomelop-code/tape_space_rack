@@ -93,7 +93,7 @@ int main (int argc, char** argv)
     std::printf ("96k re-prepare: max %.3f nan %d\n", mx, (int) nan);
     proc.prepareToPlay (48000, 512);
     proc.applyRackPreset (rackPreset >= 0 ? rackPreset : 0);
-    if (rackPreset < 0) { proc.setPlain (1, "variant", 1); proc.setPlain (1, "heads", 6); proc.setPlain (1, "reverse", 0); proc.setPlain (2, "reverse", 1); proc.setPlain (2, "revLen", 1200); }
+    if (rackPreset < 0) { proc.setPlain (1, "variant", 1); proc.setPlain (1, "heads", 6); proc.setPlain (1, "reverse", 0); proc.setPlain (2, "reverse", 1); proc.setPlain (2, "revLen", 1200); proc.setPlain (1, "sync", 33); proc.setPlain (2, "preSync", 6); proc.setPlain (2, "revSync", 15); proc.setPlain (2, "decaySync", 21); }
     juce::Thread::sleep (300);
     run (proc, 100, mx, nan, e, 2);
     std::unique_ptr<juce::AudioProcessorEditor> ed (proc.createEditor());
@@ -108,6 +108,10 @@ int main (int argc, char** argv)
         juce::Thread::sleep (15);
     }
     rack->hover (hlSlot, hlBand, juce::String::fromUTF8 ("（スナップショット用のハイライト）"));
+    if (argc > 6 && juce::String (argv[6]) == "picker")
+        rack->openPicker ("DELAY TIME SYNC", [&proc] { return (int) proc.getPlain (1, "sync"); }, [&proc] (int i) { proc.setPlain (1, "sync", i); });
+    std::printf ("sync check: delay sync %d (%s) -> %.3f ms at %.1f BPM; reverb decaySync %d -> RT %.3f s\n", (int) proc.getPlain (1, "sync"), ts::notes()[(size_t) proc.getPlain (1, "sync")].name.c_str(),
+                 ts::delayMs (proc.reader.params (1), proc.hostBpm.load()), proc.hostBpm.load(), (int) proc.getPlain (2, "decaySync"), ts::resolveTimes (proc.reader.params (2), proc.hostBpm.load()).decay);
     auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
     juce::File f (juce::File::getCurrentWorkingDirectory().getChildFile (outPath)); f.deleteFile();
     juce::FileOutputStream os (f); juce::PNGImageFormat().writeImageToStream (img, os);
