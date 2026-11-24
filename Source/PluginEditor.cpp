@@ -1115,7 +1115,17 @@ void ModulePanel::paint (juce::Graphics& g)
     g.drawText (typeTitle (type), railW + 54, 6, 260, 34, juce::Justification::left);
     g.setColour (col::inkDim); g.setFont (font (12.f));
     {
-        const int sx = railW + 54 + (int) textW (font (19.f, true), typeTitle (type)) + 14;
+        int sx = railW + 54 + (int) textW (font (19.f, true), typeTitle (type)) + 12;
+        // the first module of each type is the one the host's automation parameters drive
+        const bool mapped = proc.reader.mappedSlot (type) == slot;
+        const juce::String tag = mapped ? "AUTOMATION" : J ("オートメーション対象外");
+        const int tw = (int) textW (font (10.5f, true), tag) + 12;
+        const juce::Rectangle<float> tr ((float) sx, 14.f, (float) tw, 18.f);
+        g.setColour (mapped ? col::accent.withAlpha (0.18f) : col::panel2); g.fillRoundedRectangle (tr, 3.f);
+        g.setColour (mapped ? col::accent : col::inkDim); g.drawRoundedRectangle (tr, 3.f, 1.f);
+        g.setFont (font (10.5f, true)); g.drawText (tag, tr.toNearestInt(), juce::Justification::centred);
+        sx += tw + 10;
+        g.setColour (col::inkDim); g.setFont (font (12.f));
         if (subtitleRight - sx > 60) g.drawFittedText (J (subtitleOf (type)), sx, 6, subtitleRight - sx - 8, 34, juce::Justification::centredLeft, 1, 1.0f);
     }
     const int hlS = editor.highlightSlot(), hlB = editor.highlightBand();

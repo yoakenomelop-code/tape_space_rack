@@ -45,6 +45,25 @@ int main (int argc, char** argv)
     proc.setPlayConfigDetails (2, 2, 48000, 512);
     proc.prepareToPlay (48000, 512);
     std::printf ("types initially:  %s  s1 drive %.1f (expect 3), s3 decay %.2f (2.4)\n", types (proc).toRawUTF8(), proc.getPlain (0, "drive"), proc.getPlain (2, "decay"));
+    {
+        // host (automation) parameters: 64, named per module type, driving the first module of each type
+        auto params = proc.getParameters();
+        std::printf ("host params: %d  first '%s'  last '%s'\n", params.size(), params.getFirst()->getName (64).toRawUTF8(), params.getLast()->getName (64).toRawUTF8());
+        auto* dt = dynamic_cast<juce::RangedAudioParameter*> (proc.state.getParameter ("delay_time"));
+        dt->setValueNotifyingHost (dt->convertTo0to1 (437.5f));
+        std::printf ("automation delay_time=437.5 -> slot2 time %.3f (getPlain %.3f)\n", proc.reader.params (1).time, proc.getPlain (1, "time"));
+        proc.setPlain (1, "feedback", 61); std::printf ("UI feedback 61 -> host %.2f\n", proc.state.getRawParameterValue ("delay_feedback")->load());
+        proc.addModule (kDelay); proc.setPlain (3, "time", 123.456); proc.setPlain (3, "feedback", 22);
+        std::printf ("second delay: time %.3f fb %.1f, host delay_time still %.3f\n", proc.reader.params (3).time, proc.reader.params (3).feedback, proc.state.getRawParameterValue ("delay_time")->load());
+        proc.moveSlot (3, 0);   // second delay becomes the first delay → host follows it
+        std::printf ("after move: types %s host delay_time %.3f fb %.1f; old first delay (slot3) time %.3f fb %.1f\n", types (proc).toRawUTF8(),
+                     proc.state.getRawParameterValue ("delay_time")->load(), proc.state.getRawParameterValue ("delay_feedback")->load(), proc.reader.params (2).time, proc.reader.params (2).feedback);
+        juce::MemoryBlock st; proc.getStateInformation (st);
+        TapeSpaceRackProcessor q; q.setStateInformation (st.getData(), (int) st.getSize());
+        std::printf ("restored: types %s s1 time %.3f s3 time %.3f fb %.1f\n", types (q).toRawUTF8(), q.reader.params (0).time, q.reader.params (2).time, q.reader.params (2).feedback);
+        proc.moveSlot (0, 3); proc.removeSlot (3);
+        std::printf ("cleaned: types %s\n", types (proc).toRawUTF8());
+    }
     float mx = 0; bool nan = false; double e = 0;
     run (proc, 200, mx, nan, e);
     std::printf ("default rack: max %.3f nan %d energy %.1f latency %d\n", mx, (int) nan, e, proc.getLatencySamples());

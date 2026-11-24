@@ -12,18 +12,16 @@ TapeSpaceRackProcessor::TapeSpaceRackProcessor()
       juce::Thread ("Tape Space Rack worker"),
       state (*this, nullptr, "TapeSpaceRack", createLayout())
 {
-    // the parameter defaults are generic; give the default modules their own defaults (and a musical start)
+    for (auto& hp : hostParams()) hostPrm.push_back (state.getParameter (hostId (hp.type, hp.key)));
+    // default rack: tape → delay → reverb, each with a musical start
     const char* starts[3] = { "Warm 15 ips NAB", "HQ Dotted Eighth", "Concert Hall" };
-    for (int s = 0; s < 3; ++s)
+    for (int t = 0; t < 3; ++t)
     {
-        const int t = reader.type (s);
         Params p = defaultsFor (t);
-        PresetBank::apply (p, presets.moduleValuesByName (t, starts[s]));
-        const auto v = slotValues (t, p);
-        const auto& keys = slotKeys();
-        for (size_t k = 0; k < keys.size(); ++k)
-            if (auto* prm = state.getParameter (id::of (s, keys[k]))) prm->setValueNotifyingHost (v[k]);
+        PresetBank::apply (p, presets.moduleValuesByName (t, starts[t]));
+        writeSlot (t, slotValues (t, p));
     }
+    pushHost();
 }
 
 TapeSpaceRackProcessor::~TapeSpaceRackProcessor()
@@ -264,42 +262,59 @@ void TapeSpaceRackProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
 }
 
 // ----------------------------------------------------------------------------- parameter helpers
-void TapeSpaceRackProcessor::setParam (const juce::String& pid, float normalised)
+void TapeSpaceRackProcessor::setParam (juce::RangedAudioParameter* p, float normalised)
 {
-    if (auto* p = state.getParameter (pid))
-        if (std::abs (p->getValue() - normalised) > 1e-7f) { p->beginChangeGesture(); p->setValueNotifyingHost (normalised); p->endChangeGesture(); }
+    if (p != nullptr && std::abs (p->getValue() - normalised) > 1e-7f) { p->beginChangeGesture(); p->setValueNotifyingHost (normalised); p->endChangeGesture(); }
 }
+void TapeSpaceRackProcessor::markDirty() { updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true)); }
 void TapeSpaceRackProcessor::setPlain (int slot, const char* key, double value)
 {
-    if (auto* p = state.getParameter (id::of (slot, key))) setParam (id::of (slot, key), p->convertTo0to1 ((float) value));
+    const int k = keyIndex (key);
+    if (k < 0 || ! juce::isPositiveAndBelow (slot, numSlots())) return;
+    const int t = reader.type (slot);
+    const int h = reader.mappedSlot (t) == slot ? hostIndex (t, k) : -1;
+    if (k == 0) { editRack ([&] { store.v[(size_t) slot][0] = value; }); return; }   // module type changes the mapping
+    store.v[(size_t) slot][(size_t) k] = value;
+    if (h >= 0) { auto* p = hostPrm[(size_t) h]; setParam (p, p->convertTo0to1 ((float) value)); }   // host-visible: automation can be recorded
+    else markDirty();
 }
 double TapeSpaceRackProcessor::getPlain (int slot, const char* key) const
 {
-    if (auto* p = state.getRawParameterValue (id::of (slot, key))) return p->load();
-    return 0;
+    const int k = keyIndex (key);
+    return k >= 0 && juce::isPositiveAndBelow (slot, numSlots()) ? reader.value (slot, k) : 0.0;
 }
-std::vector<float> TapeSpaceRackProcessor::readSlot (int slot) const
+void TapeSpaceRackProcessor::flushHost()
 {
-    std::vector<float> v;
-    for (auto* k : slotKeys()) v.push_back (state.getParameter (id::of (slot, k))->getValue());
+    for (int t = 0; t < 3; ++t)
+    {
+        const int s = reader.mappedSlot (t); if (s < 0) continue;
+        for (auto& hp : hostParams()) if (hp.type == t) { const int k = keyIndex (hp.key); store.v[(size_t) s][(size_t) k] = reader.value (s, k); }
+    }
+}
+void TapeSpaceRackProcessor::pushHost()
+{
+    const auto& hps = hostParams();
+    for (int t = 0; t < 3; ++t)
+    {
+        const int s = reader.mappedSlot (t); if (s < 0) continue;
+        for (size_t i = 0; i < hps.size(); ++i)
+            if (hps[i].type == t) { auto* p = hostPrm[i]; setParam (p, p->convertTo0to1 ((float) store.v[(size_t) s][(size_t) keyIndex (hps[i].key)].load())); }
+    }
+}
+std::vector<double> TapeSpaceRackProcessor::readSlot (int slot) const
+{
+    std::vector<double> v;
+    for (auto& x : store.v[(size_t) slot]) v.push_back (x.load());
     return v;
 }
-void TapeSpaceRackProcessor::writeSlot (int slot, const std::vector<float>& values)
+void TapeSpaceRackProcessor::writeSlot (int slot, const std::vector<double>& values)
 {
-    const auto& keys = slotKeys();
-    for (size_t k = 0; k < keys.size() && k < values.size(); ++k) setParam (id::of (slot, keys[k]), values[k]);
+    for (size_t k = 0; k < values.size() && k < store.v[(size_t) slot].size(); ++k) store.v[(size_t) slot][k] = values[k];
 }
-std::vector<float> TapeSpaceRackProcessor::slotValues (int tsType, const Params& p, bool on) const
+std::vector<double> TapeSpaceRackProcessor::slotValues (int tsType, const Params& p, bool on) const
 {
-    std::vector<float> v;
-    for (auto* k : slotKeys())
-    {
-        auto* prm = state.getParameter (id::of (0, k));
-        const juce::String key (k);
-        if (key == id::type) v.push_back (prm->convertTo0to1 ((float) (tsType >= 0 ? slotTypeOf (tsType) : 0)));
-        else if (key == id::on) v.push_back (on ? 1.f : 0.f);
-        else v.push_back (prm->convertTo0to1 ((float) (p.*(specOf (key)->field))));
-    }
+    std::vector<double> v { (double) (tsType >= 0 ? slotTypeOf (tsType) : 0), on ? 1.0 : 0.0 };
+    for (auto& sp : paramSpecs()) v.push_back (p.*(sp.field));
     return v;
 }
 void TapeSpaceRackProcessor::permuteUserIR (const std::function<void (std::array<UserIR, (size_t) numSlots()>&)>& fn)
@@ -320,33 +335,34 @@ bool TapeSpaceRackProcessor::addModule (int t)
     const int s = usedSlots();
     if (s >= numSlots()) return false;
     permuteUserIR ([s] (auto& u) { u[(size_t) s] = {}; });
-    writeSlot (s, slotValues (t, defaultsFor (t)));
+    editRack ([&] { writeSlot (s, slotValues (t, defaultsFor (t))); });
     return true;
 }
 void TapeSpaceRackProcessor::removeSlot (int slot)
 {
     const int n = usedSlots();
     if (slot < 0 || slot >= n) return;
-    for (int s = slot; s < n - 1; ++s) writeSlot (s, readSlot (s + 1));
-    writeSlot (n - 1, slotValues (-1, Params()));
+    editRack ([&] { for (int s = slot; s < n - 1; ++s) writeSlot (s, readSlot (s + 1)); writeSlot (n - 1, slotValues (-1, Params())); });
     permuteUserIR ([slot, n] (auto& u) { for (int s = slot; s < n - 1; ++s) u[(size_t) s] = u[(size_t) s + 1]; u[(size_t) n - 1] = {}; });
 }
 void TapeSpaceRackProcessor::duplicateSlot (int slot)
 {
     const int n = usedSlots();
     if (n >= numSlots() || slot < 0 || slot >= n) return;
-    for (int s = n; s > slot + 1; --s) writeSlot (s, readSlot (s - 1));
-    writeSlot (slot + 1, readSlot (slot));
+    editRack ([&] { for (int s = n; s > slot + 1; --s) writeSlot (s, readSlot (s - 1)); writeSlot (slot + 1, readSlot (slot)); });
     permuteUserIR ([slot, n] (auto& u) { for (int s = n; s > slot + 1; --s) u[(size_t) s] = u[(size_t) s - 1]; u[(size_t) slot + 1] = u[(size_t) slot]; });
 }
 void TapeSpaceRackProcessor::moveSlot (int from, int to)
 {
     const int n = usedSlots();
     if (from == to || from < 0 || to < 0 || from >= n || to >= n) return;
-    const auto moving = readSlot (from);
-    if (from < to) for (int s = from; s < to; ++s) writeSlot (s, readSlot (s + 1));
-    else           for (int s = from; s > to; --s) writeSlot (s, readSlot (s - 1));
-    writeSlot (to, moving);
+    editRack ([&]
+    {
+        const auto moving = readSlot (from);
+        if (from < to) for (int s = from; s < to; ++s) writeSlot (s, readSlot (s + 1));
+        else           for (int s = from; s > to; --s) writeSlot (s, readSlot (s - 1));
+        writeSlot (to, moving);
+    });
     permuteUserIR ([from, to] (auto& u)
     {
         const UserIR m = u[(size_t) from];
@@ -380,13 +396,15 @@ void TapeSpaceRackProcessor::applyModulePreset (int slot, int index)
     if (t < 0 || ! juce::isPositiveAndBelow (index, presets.numModule (t))) return;
     Params p = defaultsFor (t);
     PresetBank::apply (p, presets.moduleValues (t, index));
-    writeSlot (slot, slotValues (t, p, reader.on (slot)));
+    const bool on = reader.on (slot);
+    editRack ([&] { writeSlot (slot, slotValues (t, p, on)); });
 }
 void TapeSpaceRackProcessor::applyRackPreset (int index)
 {
     const auto slots = presets.rackSlots (index);
     if (! slots.isArray()) return;
     permuteUserIR ([] (auto& u) { for (auto& x : u) x = {}; });
+    flushHost();
     for (int s = 0; s < numSlots(); ++s)
     {
         if (s >= slots.size()) { writeSlot (s, slotValues (-1, Params())); continue; }
@@ -398,6 +416,7 @@ void TapeSpaceRackProcessor::applyRackPreset (int index)
         const bool on = ! sl.hasProperty ("on") || (bool) sl["on"];
         writeSlot (s, slotValues (t, p, on));
     }
+    pushHost(); markDirty();
 }
 int TapeSpaceRackProcessor::getNumPrograms() { return std::max (1, presets.numRack()); }
 const juce::String TapeSpaceRackProcessor::getProgramName (int index) { return presets.rackName (index); }
@@ -411,7 +430,18 @@ void TapeSpaceRackProcessor::setCurrentProgram (int index)
 // ----------------------------------------------------------------------------- state (parameters + embedded user IRs)
 void TapeSpaceRackProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
+    flushHost();
     auto st = state.copyState();
+    st.removeChild (st.getChildWithName ("Rack"), nullptr);
+    juce::ValueTree rack ("Rack");
+    for (int s = 0; s < numSlots(); ++s)
+    {
+        juce::ValueTree t ("Slot");
+        const auto& keys = slotKeys();
+        for (size_t k = 0; k < keys.size(); ++k) t.setProperty (keys[k], store.v[(size_t) s][k].load(), nullptr);
+        rack.appendChild (t, nullptr);
+    }
+    st.appendChild (rack, nullptr);
     juce::ValueTree irs ("UserIRs");
     {
         const juce::ScopedLock sl (irLock);
@@ -459,6 +489,17 @@ void TapeSpaceRackProcessor::setStateInformation (const void* data, int sizeInBy
     }
     tree.removeChild (irs, nullptr);
     permuteUserIR ([&loaded] (auto& u) { u = loaded; });
+    const auto rack = tree.getChildWithName ("Rack");
+    if (rack.isValid())
+    {
+        const auto& keys = slotKeys();
+        for (int s = 0; s < numSlots() && s < rack.getNumChildren(); ++s)
+        {
+            const auto t = rack.getChild (s);
+            for (size_t k = 0; k < keys.size(); ++k) if (t.hasProperty (keys[k])) store.v[(size_t) s][k] = (double) t[keys[k]];
+        }
+    }
+    tree.removeChild (rack, nullptr);
     state.replaceState (tree);
 }
 

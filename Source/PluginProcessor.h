@@ -71,7 +71,8 @@ public:
     double getPlain (int slot, const char* key) const;
     const ts::PresetBank presets;
     int currentProgram = 0;
-    ts::ParamReader reader { state };
+    ts::SlotStore store;                                     // the rack (all modules, plain values)
+    ts::ParamReader reader { state, store };
 
     // ---- user impulse responses (message thread; the worker reads them under the lock)
     juce::String loadUserIR (int slot, const juce::File& file);         // returns an error text, empty on success
@@ -86,10 +87,15 @@ private:
     void buildSlot (int s, bool publish);
     std::string irKeyOf (int s, const ts::Params& p) const;
     ts::IR resampledUserIR (int s, double fs);
-    std::vector<float> readSlot (int slot) const;
-    void writeSlot (int slot, const std::vector<float>& values);
-    std::vector<float> slotValues (int tsType, const ts::Params& p, bool on = true) const;
-    void setParam (const juce::String& pid, float normalised);
+    std::vector<double> readSlot (int slot) const;
+    void writeSlot (int slot, const std::vector<double>& values);
+    std::vector<double> slotValues (int tsType, const ts::Params& p, bool on = true) const;
+    void setParam (juce::RangedAudioParameter* p, float normalised);
+    void flushHost();                                      // host parameters → store (first module of each type)
+    void pushHost();                                       // store → host parameters
+    void editRack (const std::function<void()>& fn) { flushHost(); fn(); pushHost(); markDirty(); }
+    void markDirty();
+    std::vector<juce::RangedAudioParameter*> hostPrm;
     void permuteUserIR (const std::function<void (std::array<UserIR, (size_t) ts::numSlots()>&)>& fn);
 
     // deferred deletion: the audio thread hands objects to the worker through a lock-free FIFO
