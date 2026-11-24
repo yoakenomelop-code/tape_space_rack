@@ -1,0 +1,663 @@
+{
+ "module": {
+  "tape": [
+   {
+    "name": "Clean 30 ips Master",
+    "p": {
+     "speed": 30,
+     "formula": 0,
+     "c1": 2
+    }
+   },
+   {
+    "name": "Warm 15 ips NAB",
+    "p": {
+     "speed": 15,
+     "formula": 1,
+     "drive": 3
+    }
+   },
+   {
+    "name": "Silky 15 ips CCIR",
+    "p": {
+     "speed": 15,
+     "eqStd": 1,
+     "formula": 0,
+     "drive": 2
+    }
+   },
+   {
+    "name": "Hot 15 ips Glue",
+    "p": {
+     "speed": 15,
+     "formula": 1,
+     "drive": 6,
+     "c3": 1
+    }
+   },
+   {
+    "name": "Multitrack 15 ips Drums",
+    "p": {
+     "variant": 1,
+     "speed": 15,
+     "formula": 1,
+     "drive": 6
+    }
+   },
+   {
+    "name": "Multitrack 7.5 ips Fat",
+    "p": {
+     "variant": 1,
+     "speed": 7.5,
+     "formula": 2,
+     "drive": 5
+    }
+   },
+   {
+    "name": "Vintage 7.5 ips Saturated",
+    "p": {
+     "speed": 7.5,
+     "formula": 2,
+     "drive": 9,
+     "age": 30,
+     "wow": 10,
+     "flutter": 15,
+     "hiss": 30
+    }
+   },
+   {
+    "name": "Lo-fi 3.75 ips",
+    "p": {
+     "speed": 3.75,
+     "formula": 2,
+     "drive": 6,
+     "wow": 35,
+     "flutter": 30,
+     "hiss": 50,
+     "age": 50
+    }
+   },
+   {
+    "name": "Cassette Demo",
+    "p": {
+     "variant": 2,
+     "formula": 1,
+     "drive": 3,
+     "wow": 25,
+     "flutter": 25,
+     "hiss": 40
+    }
+   },
+   {
+    "name": "Cassette Worn Out",
+    "p": {
+     "variant": 2,
+     "formula": 2,
+     "drive": 6,
+     "wow": 60,
+     "flutter": 50,
+     "hiss": 60,
+     "age": 70,
+     "c2": 1
+    }
+   },
+   {
+    "name": "Subtle Polish",
+    "p": {
+     "speed": 30,
+     "formula": 0,
+     "drive": 1,
+     "c1": 1
+    }
+   },
+   {
+    "name": "Bias Under (Bright Grit)",
+    "p": {
+     "speed": 15,
+     "formula": 1,
+     "drive": 5,
+     "bias": -60
+    }
+   },
+   {
+    "name": "Bias Over (Dark Smooth)",
+    "p": {
+     "speed": 15,
+     "formula": 1,
+     "drive": 5,
+     "bias": 70
+    }
+   }
+  ],
+  "delay": [
+   {
+    "name": "HQ Quarter (Sync)",
+    "p": {
+     "variant": 0,
+     "sync": 9,
+     "feedback": 30
+    }
+   },
+   {
+    "name": "HQ Dotted Eighth",
+    "p": {
+     "variant": 0,
+     "sync": 7,
+     "feedback": 40,
+     "mix": 25
+    }
+   },
+   {
+    "name": "HQ Slapback 90 ms",
+    "p": {
+     "variant": 0,
+     "time": 90,
+     "feedback": 0,
+     "stereo": 0,
+     "mix": 25
+    }
+   },
+   {
+    "name": "HQ Wide Dual 1/4 : 1/8.",
+    "p": {
+     "variant": 0,
+     "stereo": 3,
+     "sync": 9,
+     "ratioLR": 75,
+     "feedback": 35
+    }
+   },
+   {
+    "name": "Ping-Pong Eighths",
+    "p": {
+     "variant": 0,
+     "stereo": 2,
+     "sync": 6,
+     "feedback": 45
+    }
+   },
+   {
+    "name": "Ping-Pong Triplets",
+    "p": {
+     "variant": 0,
+     "stereo": 2,
+     "sync": 5,
+     "feedback": 40,
+     "highcut": 8000
+    }
+   },
+   {
+    "name": "Reverse Swell",
+    "p": {
+     "variant": 0,
+     "reverse": 1,
+     "time": 600,
+     "feedback": 35,
+     "mix": 40
+    }
+   },
+   {
+    "name": "Reverse Ping-Pong",
+    "p": {
+     "variant": 0,
+     "reverse": 1,
+     "stereo": 2,
+     "sync": 9,
+     "feedback": 40,
+     "mix": 35
+    }
+   },
+   {
+    "name": "Telephone Echo (Wet EQ)",
+    "p": {
+     "variant": 0,
+     "time": 300,
+     "feedback": 35,
+     "lowcut": 300,
+     "highcut": 3500,
+     "eqLo": -12,
+     "eqMid": 8,
+     "eqMidF": 1500,
+     "eqHi": -12
+    }
+   },
+   {
+    "name": "Dark Ambient Wash",
+    "p": {
+     "variant": 0,
+     "sync": 10,
+     "feedback": 75,
+     "highcut": 3000,
+     "modDepth": 20,
+     "mix": 35,
+     "eqHi": -4
+    }
+   },
+   {
+    "name": "Tape Echo Single Head",
+    "p": {
+     "variant": 1,
+     "heads": 0,
+     "time": 320,
+     "feedback": 40,
+     "hiss": 30,
+     "drive": 3
+    }
+   },
+   {
+    "name": "Tape Echo Multi-Head",
+    "p": {
+     "variant": 1,
+     "heads": 6,
+     "time": 180,
+     "feedback": 45,
+     "hiss": 30
+    }
+   },
+   {
+    "name": "Tape Echo Runaway",
+    "p": {
+     "variant": 1,
+     "heads": 3,
+     "time": 280,
+     "feedback": 105,
+     "drive": 6,
+     "hiss": 40,
+     "age": 30
+    }
+   },
+   {
+    "name": "Rockabilly Slap",
+    "p": {
+     "variant": 1,
+     "heads": 0,
+     "time": 110,
+     "feedback": 10,
+     "stereo": 0,
+     "mix": 30
+    }
+   },
+   {
+    "name": "Analog BBD Warm",
+    "p": {
+     "variant": 2,
+     "time": 350,
+     "feedback": 45,
+     "modDepth": 10,
+     "hiss": 20
+    }
+   },
+   {
+    "name": "BBD Chorus-Echo",
+    "p": {
+     "variant": 2,
+     "time": 250,
+     "modRate": 0.8,
+     "modDepth": 40,
+     "feedback": 30,
+     "hiss": 20
+    }
+   },
+   {
+    "name": "BBD Long Murky",
+    "p": {
+     "variant": 2,
+     "time": 900,
+     "feedback": 55,
+     "hiss": 30
+    }
+   },
+   {
+    "name": "Vintage 12-bit Rack",
+    "p": {
+     "variant": 3,
+     "time": 400,
+     "feedback": 40
+    }
+   },
+   {
+    "name": "Vintage Digital Dub",
+    "p": {
+     "variant": 3,
+     "sync": 10,
+     "feedback": 70,
+     "lowcut": 200,
+     "highcut": 4000,
+     "stereo": 2,
+     "eqMid": 4,
+     "eqMidF": 900
+    }
+   },
+   {
+    "name": "Ducked Vocal Echo",
+    "p": {
+     "variant": 0,
+     "sync": 9,
+     "feedback": 35,
+     "duck": 70,
+     "mix": 35,
+     "lowcut": 200,
+     "eqHi": -3
+    }
+   }
+  ],
+  "reverb": [
+   {
+    "name": "Concert Hall",
+    "p": {
+     "variant": 0,
+     "decay": 2.4,
+     "predelay": 25
+    }
+   },
+   {
+    "name": "Large Hall Long",
+    "p": {
+     "variant": 0,
+     "size": 150,
+     "decay": 4.5,
+     "predelay": 40
+    }
+   },
+   {
+    "name": "Small Room",
+    "p": {
+     "variant": 1,
+     "decay": 0.6,
+     "size": 80,
+     "predelay": 5,
+     "er": 70
+    }
+   },
+   {
+    "name": "Drum Room",
+    "p": {
+     "variant": 1,
+     "decay": 0.9,
+     "er": 80,
+     "lowcut": 150,
+     "mix": 30
+    }
+   },
+   {
+    "name": "Vocal Plate",
+    "p": {
+     "variant": 2,
+     "decay": 1.8,
+     "predelay": 30,
+     "hiMult": 0.8,
+     "lowcut": 200,
+     "er": 0
+    }
+   },
+   {
+    "name": "Bright Plate Short",
+    "p": {
+     "variant": 2,
+     "decay": 1.1,
+     "hiMult": 0.9,
+     "er": 0
+    }
+   },
+   {
+    "name": "Chamber",
+    "p": {
+     "variant": 3,
+     "decay": 1.5,
+     "predelay": 12
+    }
+   },
+   {
+    "name": "Cathedral",
+    "p": {
+     "variant": 4,
+     "decay": 6,
+     "predelay": 60,
+     "size": 120
+    }
+   },
+   {
+    "name": "Infinite Pad",
+    "p": {
+     "variant": 4,
+     "decay": 20,
+     "modulation": 60,
+     "mix": 40,
+     "hiMult": 0.4
+    }
+   },
+   {
+    "name": "IR Concert Hall",
+    "p": {
+     "source": 1,
+     "irIndex": 0
+    }
+   },
+   {
+    "name": "IR Wood Room",
+    "p": {
+     "source": 1,
+     "irIndex": 1,
+     "mix": 30
+    }
+   },
+   {
+    "name": "IR Bright Plate",
+    "p": {
+     "source": 1,
+     "irIndex": 2
+    }
+   },
+   {
+    "name": "IR Stone Chamber",
+    "p": {
+     "source": 1,
+     "irIndex": 3
+    }
+   },
+   {
+    "name": "IR Vocal Booth",
+    "p": {
+     "source": 1,
+     "irIndex": 4,
+     "mix": 30
+    }
+   },
+   {
+    "name": "IR Large Church",
+    "p": {
+     "source": 1,
+     "irIndex": 5,
+     "predelay": 10
+    }
+   },
+   {
+    "name": "IR Spring Tank",
+    "p": {
+     "source": 1,
+     "irIndex": 6,
+     "lowcut": 150,
+     "predelay": 0
+    }
+   },
+   {
+    "name": "Reverse Hall Swell",
+    "p": {
+     "source": 0,
+     "reverse": 1,
+     "variant": 0,
+     "decay": 3,
+     "revLen": 1500,
+     "mix": 35
+    }
+   },
+   {
+    "name": "Reverse Plate Lead-in",
+    "p": {
+     "source": 0,
+     "reverse": 1,
+     "variant": 2,
+     "decay": 2,
+     "revLen": 800,
+     "er": 0,
+     "mix": 35
+    }
+   },
+   {
+    "name": "Reverse Church IR",
+    "p": {
+     "source": 1,
+     "irIndex": 5,
+     "reverse": 1,
+     "revLen": 2500,
+     "mix": 35
+    }
+   }
+  ]
+ },
+ "rack": [
+  {
+   "name": "Tape + Slap + Room",
+   "slots": [
+    {
+     "type": "tape",
+     "preset": "Warm 15 ips NAB"
+    },
+    {
+     "type": "delay",
+     "preset": "Rockabilly Slap"
+    },
+    {
+     "type": "reverb",
+     "preset": "Small Room"
+    }
+   ]
+  },
+  {
+   "name": "Modern Vocal",
+   "slots": [
+    {
+     "type": "tape",
+     "preset": "Subtle Polish"
+    },
+    {
+     "type": "delay",
+     "preset": "Ducked Vocal Echo"
+    },
+    {
+     "type": "reverb",
+     "preset": "Vocal Plate"
+    }
+   ]
+  },
+  {
+   "name": "Dub Station",
+   "slots": [
+    {
+     "type": "tape",
+     "preset": "Vintage 7.5 ips Saturated"
+    },
+    {
+     "type": "delay",
+     "preset": "Tape Echo Runaway",
+     "p": {
+      "feedback": 85
+     }
+    },
+    {
+     "type": "reverb",
+     "preset": "IR Spring Tank"
+    }
+   ]
+  },
+  {
+   "name": "Ambient Wash",
+   "slots": [
+    {
+     "type": "delay",
+     "preset": "Dark Ambient Wash"
+    },
+    {
+     "type": "reverb",
+     "preset": "Infinite Pad"
+    }
+   ]
+  },
+  {
+   "name": "Lo-fi Cassette Dream",
+   "slots": [
+    {
+     "type": "tape",
+     "preset": "Cassette Worn Out"
+    },
+    {
+     "type": "delay",
+     "preset": "BBD Chorus-Echo"
+    },
+    {
+     "type": "reverb",
+     "preset": "Chamber"
+    }
+   ]
+  },
+  {
+   "name": "Reverse Dream",
+   "slots": [
+    {
+     "type": "delay",
+     "preset": "Reverse Swell"
+    },
+    {
+     "type": "reverb",
+     "preset": "Reverse Hall Swell"
+    }
+   ]
+  },
+  {
+   "name": "Big Drums",
+   "slots": [
+    {
+     "type": "tape",
+     "preset": "Multitrack 15 ips Drums"
+    },
+    {
+     "type": "reverb",
+     "preset": "Drum Room"
+    }
+   ]
+  },
+  {
+   "name": "Church Ping-Pong",
+   "slots": [
+    {
+     "type": "delay",
+     "preset": "Ping-Pong Eighths",
+     "p": {
+      "mix": 25
+     }
+    },
+    {
+     "type": "reverb",
+     "preset": "IR Large Church"
+    }
+   ]
+  },
+  {
+   "name": "Tape Echo into Plate",
+   "slots": [
+    {
+     "type": "tape",
+     "preset": "Hot 15 ips Glue"
+    },
+    {
+     "type": "delay",
+     "preset": "Tape Echo Multi-Head"
+    },
+    {
+     "type": "reverb",
+     "preset": "Vocal Plate"
+    }
+   ]
+  }
+ ]
+}

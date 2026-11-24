@@ -1,0 +1,59 @@
+# Builds Mac (AU + VST3, Universal) and Windows (VST3) on GitHub — no local toolchain needed.
+# Push this folder to a GitHub repository, open the "Actions" tab, and download the "TapeSpaceRack-*" artifacts.
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: mac
+          - os: windows-latest
+            name: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Collect (mac)
+        if: matrix.name == 'mac'
+        run: |
+          mkdir -p out/Components out/VST3
+          find build -path "*Release/AU/*.component" -maxdepth 4 -exec cp -R {} out/Components/ \;
+          find build -path "*Release/VST3/*.vst3" -maxdepth 4 -exec cp -R {} out/VST3/ \;
+          # ad-hoc signature so the plug-ins load on Apple Silicon
+          for p in out/Components/*.component out/VST3/*.vst3; do codesign --force --deep -s - "$p"; done
+          # GitHub artifacts drop file permissions, so pack with ditto (keeps permissions + signatures)
+          ditto -c -k --keepParent out TapeSpaceRack-mac.zip
+          rm -rf out && mkdir out && mv TapeSpaceRack-mac.zip out/
+
+      - name: Collect (windows)
+        if: matrix.name == 'windows'
+        shell: bash
+        run: |
+          mkdir -p out/VST3
+          find build -path "*Release/VST3/*.vst3" -maxdepth 4 -exec cp -R {} out/VST3/ \;
+
+      - name: Validate with pluginval (informational)
+        if: matrix.name == 'mac'
+        continue-on-error: true
+        run: |
+          curl -sSL -o pv.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_macOS.zip
+          unzip -q pv.zip
+          find build -maxdepth 4 -path "*Release/VST3/*.vst3" -print0 | while IFS= read -r -d '' p; do ./pluginval.app/Contents/MacOS/pluginval --strictness-level 5 --skip-gui-tests --validate "$p"; done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TapeSpaceRack-${{ matrix.name }}
+          path: out

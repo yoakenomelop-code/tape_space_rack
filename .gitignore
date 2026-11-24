@@ -1,0 +1,5 @@
+build/
+out/
+.DS_Store
+tests/parity_cases.h
+tests/parity_js_out.bin
