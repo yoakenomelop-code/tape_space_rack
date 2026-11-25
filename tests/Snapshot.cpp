@@ -48,7 +48,7 @@ int main (int argc, char** argv)
     {
         // host (automation) parameters: 64, named per module type, driving the first module of each type
         auto params = proc.getParameters();
-        std::printf ("host params: %d  first '%s'  last '%s'\n", params.size(), params.getFirst()->getName (64).toRawUTF8(), params.getLast()->getName (64).toRawUTF8());
+        std::printf ("host params: %d (incl. bypass %d) programs %d  first '%s'  last '%s'\n", params.size(), (int) params.contains (proc.getBypassParameter()), proc.getNumPrograms(), params.getFirst()->getName (64).toRawUTF8(), params.getLast()->getName (64).toRawUTF8());
         auto* dt = dynamic_cast<juce::RangedAudioParameter*> (proc.state.getParameter ("delay_time"));
         dt->setValueNotifyingHost (dt->convertTo0to1 (437.5f));
         std::printf ("automation delay_time=437.5 -> slot2 time %.3f (getPlain %.3f)\n", proc.reader.params (1).time, proc.getPlain (1, "time"));
@@ -99,13 +99,13 @@ int main (int argc, char** argv)
     proc2.setStateInformation (mb.getData(), (int) mb.getSize());
     proc2.prepareToPlay (48000, 512);
     std::printf ("state %d bytes, restored types %s user IR '%s' built %d\n", (int) mb.getSize(), types (proc2).toRawUTF8(), proc2.userIRName (4).toRawUTF8(), (int) proc2.currentIR (4)[0].size());
-    std::printf ("programs: %d, first '%s', last '%s'\n", proc.getNumPrograms(), proc.getProgramName (0).toRawUTF8(), proc.getProgramName (proc.getNumPrograms() - 1).toRawUTF8());
-    for (int pr = 0; pr < proc.getNumPrograms(); ++pr)
+    std::printf ("programs: %d, first '%s', last '%s'\n", proc.presets.numRack(), proc.presets.rackName (0).toRawUTF8(), proc.presets.rackName (proc.presets.numRack() - 1).toRawUTF8());
+    for (int pr = 0; pr < proc.presets.numRack(); ++pr)
     {
         proc.applyRackPreset (pr);
         juce::Thread::sleep (150);
         mx = 0; e = 0; run (proc, 120, mx, nan, e, 3);
-        std::printf ("  preset %d %-24s types %s max %.3f nan %d energy %.1f\n", pr, proc.getProgramName (pr).toRawUTF8(), types (proc).toRawUTF8(), mx, (int) nan, e);
+        std::printf ("  preset %d %-24s types %s max %.3f nan %d energy %.1f\n", pr, proc.presets.rackName (pr).toRawUTF8(), types (proc).toRawUTF8(), mx, (int) nan, e);
     }
     proc.prepareToPlay (96000, 256);
     mx = 0; e = 0; run (proc, 200, mx, nan, e);

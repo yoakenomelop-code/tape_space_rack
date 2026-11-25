@@ -13,6 +13,8 @@ TapeSpaceRackProcessor::TapeSpaceRackProcessor()
       state (*this, nullptr, "TapeSpaceRack", createLayout())
 {
     for (auto& hp : hostParams()) hostPrm.push_back (state.getParameter (hostId (hp.type, hp.key)));
+    bypassPrm = state.getParameter (bypassId);
+    jassert (getParameters().size() == 63);
     // default rack: tape → delay → reverb, each with a musical start
     const char* starts[3] = { "Warm 15 ips NAB", "HQ Dotted Eighth", "Concert Hall" };
     for (int t = 0; t < 3; ++t)
@@ -208,6 +210,11 @@ void TapeSpaceRackProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         if (auto pos = ph->getPosition())
             if (auto b = pos->getBpm()) { if (*b > 1) { hostBpm.store (*b); bpmFromHost.store (true); } }
     const double bpm = hostBpm.load();
+    if (bypassPrm != nullptr && bypassPrm->getValue() >= 0.5f)        // host bypass: dry signal through, rack untouched
+    {
+        outPeak.store (std::max (outPeak.load(), buffer.getMagnitude (0, n)));
+        return;
+    }
 
     juce::AudioBuffer<float>* work = &buffer;
     if (numCh == 1)
@@ -417,14 +424,6 @@ void TapeSpaceRackProcessor::applyRackPreset (int index)
         writeSlot (s, slotValues (t, p, on));
     }
     pushHost(); markDirty();
-}
-int TapeSpaceRackProcessor::getNumPrograms() { return std::max (1, presets.numRack()); }
-const juce::String TapeSpaceRackProcessor::getProgramName (int index) { return presets.rackName (index); }
-void TapeSpaceRackProcessor::setCurrentProgram (int index)
-{
-    if (index == currentProgram || ! juce::isPositiveAndBelow (index, getNumPrograms())) return;
-    currentProgram = index;
-    applyRackPreset (index);
 }
 
 // ----------------------------------------------------------------------------- state (parameters + embedded user IRs)

@@ -1367,7 +1367,7 @@ TapeSpaceRackEditor::TapeSpaceRackEditor (TapeSpaceRackProcessor& p) : AudioProc
         addAndMakeVisible (b);
     }
     headerPreset.setTextWhenNothingSelected (J ("ラックプリセット…"));
-    for (int i = 0; i < proc.getNumPrograms(); ++i) headerPreset.addItem (proc.getProgramName (i), i + 1);
+    for (int i = 0; i < proc.presets.numRack(); ++i) headerPreset.addItem (proc.presets.rackName (i), i + 1);
     const juce::Component::SafePointer<TapeSpaceRackEditor> safeThis (this);
     headerPreset.onChange = [this, safeThis]
     {

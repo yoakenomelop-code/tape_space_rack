@@ -36,10 +36,13 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 12.0; }
 
-    int getNumPrograms() override;
-    int getCurrentProgram() override { return currentProgram; }
-    void setCurrentProgram (int index) override;
-    const juce::String getProgramName (int index) override;
+    // one program only: a VST3 "Program" parameter would push Ableton Live over its 64-parameter auto-list limit.
+    // Rack presets are in the plug-in's own menu.
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return "Default"; }
+    juce::AudioProcessorParameter* getBypassParameter() const override { return bypassPrm; }
     void changeProgramName (int, const juce::String&) override {}
 
     void getStateInformation (juce::MemoryBlock& destData) override;
@@ -96,6 +99,7 @@ private:
     void editRack (const std::function<void()>& fn) { flushHost(); fn(); pushHost(); markDirty(); }
     void markDirty();
     std::vector<juce::RangedAudioParameter*> hostPrm;
+    juce::AudioProcessorParameter* bypassPrm = nullptr;
     void permuteUserIR (const std::function<void (std::array<UserIR, (size_t) ts::numSlots()>&)>& fn);
 
     // deferred deletion: the audio thread hands objects to the worker through a lock-free FIFO

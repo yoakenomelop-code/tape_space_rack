@@ -109,22 +109,23 @@ struct SlotStore
     }
 };
 
-// ----------------------------------------------------------------- host (automation) parameters: exactly 64
-// Ableton Live lists every parameter of a plug-in automatically only when it has 64 or fewer, so the host sees one fixed,
-// clearly named set per module type. Each set drives the FIRST module of that type in the rack.
+// ----------------------------------------------------------------- host (automation) parameters: 62 + Bypass = 63
+// Ableton Live lists every parameter of a plug-in automatically only when it has 64 or fewer. The host sees one fixed,
+// clearly named set per module type plus our own Bypass (so the VST3 wrapper adds none), and no Program parameter
+// (getNumPrograms() == 1). Each set drives the FIRST module of that type in the rack.
+inline constexpr const char* bypassId = "bypass";
 struct HostParam { int type; const char* key; const char* name; };
 inline const std::vector<HostParam>& hostParams()
 {
     static const std::vector<HostParam> v {
         { kTape, "on", "Tape On" }, { kTape, "variant", "Tape Machine" }, { kTape, "drive", "Tape Input" }, { kTape, "formula", "Tape Formula" },
-        { kTape, "bias", "Tape Bias" }, { kTape, "speed", "Tape Speed" }, { kTape, "eqStd", "Tape EQ CCIR" }, { kTape, "wow", "Tape Wow" },
+        { kTape, "bias", "Tape Bias" }, { kTape, "speed", "Tape Speed" }, { kTape, "wow", "Tape Wow" },
         { kTape, "flutter", "Tape Flutter" }, { kTape, "hiss", "Tape Hiss" }, { kTape, "analog", "Tape Analog" }, { kTape, "mix", "Tape Mix" },
         { kTape, "output", "Tape Output" },
         { kDelay, "on", "Delay On" }, { kDelay, "variant", "Delay Model" }, { kDelay, "time", "Delay Time" }, { kDelay, "sync", "Delay Sync" },
         { kDelay, "feedback", "Delay Feedback" }, { kDelay, "lowcut", "Delay Low Cut" }, { kDelay, "highcut", "Delay High Cut" }, { kDelay, "drive", "Delay Drive" },
         { kDelay, "stereo", "Delay Stereo Mode" }, { kDelay, "ratioLR", "Delay R/L Ratio" }, { kDelay, "width", "Delay Width" }, { kDelay, "reverse", "Delay Reverse" },
-        { kDelay, "modRate", "Delay Mod Rate" }, { kDelay, "modDepth", "Delay Mod Depth" }, { kDelay, "duck", "Delay Duck" }, { kDelay, "hiss", "Delay Noise" },
-        { kDelay, "heads", "Delay Heads" }, { kDelay, "analog", "Delay Analog" }, { kDelay, "eqLo", "Delay EQ Low" }, { kDelay, "eqMid", "Delay EQ Mid" },
+        { kDelay, "modRate", "Delay Mod Rate" }, { kDelay, "modDepth", "Delay Mod Depth" }, { kDelay, "duck", "Delay Duck" }, { kDelay, "heads", "Delay Heads" }, { kDelay, "analog", "Delay Analog" }, { kDelay, "eqLo", "Delay EQ Low" }, { kDelay, "eqMid", "Delay EQ Mid" },
         { kDelay, "eqMidF", "Delay EQ Mid Freq" }, { kDelay, "eqHi", "Delay EQ High" }, { kDelay, "mix", "Delay Mix" }, { kDelay, "output", "Delay Output" },
         { kReverb, "on", "Reverb On" }, { kReverb, "variant", "Reverb Algorithm" }, { kReverb, "source", "Reverb Source" }, { kReverb, "irIndex", "Reverb Impulse" },
         { kReverb, "predelay", "Reverb Pre-delay" }, { kReverb, "preSync", "Reverb Pre-delay Sync" }, { kReverb, "size", "Reverb Size" }, { kReverb, "decay", "Reverb Decay" },
@@ -156,6 +157,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
     using namespace juce;
     AudioProcessorValueTreeState::ParameterLayout L;
     const char* groupNames[3] = { "Tape", "Delay", "Reverb" };
+    L.add (std::make_unique<AudioParameterBool> (ParameterID { bypassId, 1 }, "Bypass", false));
     for (int t = 0; t < 3; ++t)
     {
         auto g = std::make_unique<AudioProcessorParameterGroup> (typeKey (t), groupNames[t], " | ");
